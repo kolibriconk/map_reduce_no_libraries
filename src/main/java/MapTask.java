@@ -15,8 +15,19 @@ public class MapTask implements Runnable {
     @Override
     public void run() {
         for (char letter : this.line.toCharArray()) {
-
+            boolean found = false;
+            for (KeyValuePair pair : result) {
+                if (pair.equals(letter)) {
+                    pair.increment();
+                    System.out.printf("For the thread num: %s Incrementing letter: %s total: %d\n"
+                            ,Thread.currentThread().getName(), letter, pair.getValue());
+                }
+            }
+            if (!found){
+                result.add(new KeyValuePair(letter));
+                System.out.printf("For the thread num: %s Adding new letter: %s\n"
+                        , Thread.currentThread().getName() ,letter);
+            }
         }
-
     }
 }

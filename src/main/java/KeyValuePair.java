@@ -15,11 +15,11 @@ public class KeyValuePair {
         return value;
     }
 
-    public int getAsciiKey(){
-        return key;
+    public void increment() {
+        value++;
+    }
+    public boolean equals(char letter) {
+        return this.key == letter;
     }
 
-    public void addValue() {
-        this.value++;
-    }
 }
