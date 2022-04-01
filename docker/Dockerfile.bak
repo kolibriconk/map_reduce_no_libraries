@@ -1,0 +1,5 @@
+FROM openjdk:17
+COPY ./src/main /usr/src/main
+WORKDIR /usr/src/main/java
+RUN javac *.java
+CMD ["java", "Client", "File.txt"]
