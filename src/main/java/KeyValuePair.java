@@ -1,24 +1,25 @@
-public class KeyValuePair {
-    private final char key;
-    private int value;
+public class KeyValuePair<T,R> {
+    private final T key;
+    private R value;
 
-    public KeyValuePair(char value) {
+    public KeyValuePair(T value, R count) {
         this.key = value;
-        this.value = 1;
+        this.value = count;
     }
 
-    public char getKey() {
+    public T getKey() {
         return key;
     }
 
-    public int getValue() {
+    public R getValue() {
         return value;
     }
 
-    public void increment() {
-        value++;
+    public void setValue(R value) {
+        this.value = value;
     }
-    public boolean equals(char letter) {
+
+    public boolean equals(Object letter) {
         return this.key == letter;
     }
 
