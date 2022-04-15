@@ -7,6 +7,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="ats_2022_BD_12_P2" />
+        <module name="ATS_MapReduce_WordCount" />
       </profile>
     </annotationProcessing>
   </component>

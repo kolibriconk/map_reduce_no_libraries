@@ -30,6 +30,11 @@ public class Client {
                     }
                 }
             }
+            //shuffle
+
+
+
+            //reduce
         }
 
     }

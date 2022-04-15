@@ -15,7 +15,12 @@ public class MapTask implements Runnable {
     @Override
     public void run() {
         for (char letter : this.line.toCharArray()) {
-            boolean found = false;
+            result.add(new KeyValuePair(letter));
+            System.out.printf("For the thread num: %s Adding new letter: %s\n"
+                    , Thread.currentThread().getName() ,letter);
+
+
+            /*boolean found = false;
             for (KeyValuePair pair : result) {
                 if (pair.equals(letter)) {
                     pair.increment();
@@ -27,7 +32,7 @@ public class MapTask implements Runnable {
                 result.add(new KeyValuePair(letter));
                 System.out.printf("For the thread num: %s Adding new letter: %s\n"
                         , Thread.currentThread().getName() ,letter);
-            }
+            }*/
         }
     }
 }
