@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -10,72 +11,73 @@ import java.util.concurrent.TimeUnit;
 
 public class Client {
     public static void main(String[] args) {
-        if (args[args.length-1].equals("seq")) sequential(Arrays.copyOf(args, args.length-1));
-        else if(args[args.length-1].equals("par")) parallel(Arrays.copyOf(args, args.length-1));
-        else System.out.println("Cannot find execution mode");
+        if (args.length != 0) {
+            List<String> files = Arrays.asList(args);
+            //Uncomment this section to execute the comparison
+            //benchmark(files);
+
+            //Uncomment this section to execute the sequential mode
+            //sequential(files, true);
+
+            //Uncomment this section to execute the parallel mode
+            parallel(files, 10, true);
+        } else {
+            System.out.println("No files to process");
+        }
     }
 
+    private static void benchmark(List<String> files) {
+        long startTime = System.currentTimeMillis();
+        sequential(files, false);
+        long finishTime = System.currentTimeMillis();
+        System.out.println("Sequential mode takes : " + (finishTime - startTime) + " ms");
 
-    public static void sequential(String[] args){
-        for (String arg:args){
-            BufferedReader br= null;
-            try{
-                int totalletters = 0;
-                System.out.println("Reading file " + arg);
-                br = new BufferedReader(new FileReader(arg));
+        for (int i = 1; i < 20; i++) {
+            startTime = System.currentTimeMillis();
+            parallel(files, i, false);
+            finishTime = System.currentTimeMillis();
+            System.out.printf("Parallel mode with %d threads takes : %d ms\n", i, (finishTime - startTime));
+//            try {
+//                Thread.sleep(1000);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+        }
+    }
+
+    public static void sequential(List<String> files, boolean usePrint) {
+        for (String file : files) {
+            BufferedReader br = null;
+            try {
+                List<MapTask> threads = new ArrayList<>();
+                int totalWords = 0;
+                //Input of the program
+                if (usePrint) System.out.printf("%s:\n", file);
+                br = new BufferedReader(new FileReader(file));
                 String line;
-                List<KeyValuePair<Character, Float>> Mapresult = new ArrayList<>();
-                while ((line = br.readLine())!= null){ //fase map
-                    totalletters += line.split(" ").length;
-                    line=line.toLowerCase();
-                    line=line.replaceAll("[^\\w\\s\\pL]", "");
-                    List<KeyValuePair<Character, Float>> auxList = new ArrayList<>();
-                    for (String word: line.split(" ")){
-                        auxList.clear();
-                        for (char letter : word.toCharArray()){
-                            boolean trobat = false;
-                            for (KeyValuePair<Character, Float> kvp:auxList){
-                                if (kvp.getKey()== letter) {
-                                    trobat=true;
-                                    break;
-                                }
-                            }
-                            if (!trobat){
-                                auxList.add(new KeyValuePair<>(letter, 1.f));
-                            }
-                        }
-                        Mapresult.addAll(auxList);
-                    }
+                while ((line = br.readLine()) != null) {
+                    //Executing the map phase
+                    MapTask mapTask = new MapTask(line);
+                    threads.add(mapTask);
+                    mapTask.run();
                 }
-                //fase shuffle
-                List<KeyValuePair<Character, Float>> Result = new ArrayList<>();
-                List<Character> alreadyAdded = new ArrayList<>();
-                for (KeyValuePair<Character, Float> kvp:Mapresult){
-                    if (!alreadyAdded.contains(kvp.getKey())){
-                        Result.add(kvp);
-                        alreadyAdded.add(kvp.getKey());
-                    }
-                    else
-                    {
-                        Result.get(alreadyAdded.indexOf(kvp.getKey())).setValue(Result.get(alreadyAdded.indexOf(kvp.getKey())).getValue()+1);
-                    }
+                List<KeyValuePair<Character, Integer>> result = new ArrayList<>();
+                for (MapTask mapTask : threads) {
+                    result.addAll(mapTask.getResult());
+                    totalWords += mapTask.getCount();
                 }
+                List<List<KeyValuePair<Character, Integer>>> shuffledList = shuffle(result);
+                reduceSequential(shuffledList, totalWords, usePrint);
 
-                //fase reduce
-                for (KeyValuePair<Character, Float> kvp:Result){
-                    kvp.setValue((kvp.getValue()/totalletters)*100);
-                    System.out.println(kvp.getKey() + " : " + kvp.getValue() + " %");
-                }
-
-                System.out.println("Finished reading file " + arg);
-
-            } catch(IOException e){
+            } catch (IOException e) {
                 System.out.println("File not found, skipping");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             } finally {
-                if (br != null){
-                    try{
+                if (br != null) {
+                    try {
                         br.close();
-                    }catch(IOException e){
+                    } catch (IOException e) {
                         System.out.println("Cannot close the buffered reader");
                     }
                 }
@@ -83,17 +85,16 @@ public class Client {
         }
     }
 
-
-    public static void parallel(String[] args){
-        for (String arg : args) {
+    public static void parallel(List<String> files, int threadNumber, boolean usePrint) {
+        for (String file : files) {
             BufferedReader br = null;
             try {
                 List<MapTask> threads = new ArrayList<>();
-                ExecutorService es = Executors.newCachedThreadPool();
+                ExecutorService es = Executors.newFixedThreadPool(threadNumber);
                 int totalLetters = 0;
                 //Input of the program
-                System.out.println("Reading file " + arg);
-                br = new BufferedReader(new FileReader(arg));
+                if (usePrint) System.out.printf("%s:\n", file);
+                br = new BufferedReader(new FileReader(file));
                 String line;
                 while ((line = br.readLine()) != null) {
                     //Executing the map phase
@@ -109,10 +110,8 @@ public class Client {
                         totalLetters += mapTask.getCount();
                     }
                     List<List<KeyValuePair<Character, Integer>>> shuffledList = shuffle(result);
-                    reduce(shuffledList, totalLetters);
+                    reduce(shuffledList, totalLetters, usePrint);
                 }
-
-                System.out.println("Finished reading file " + arg);
             } catch (IOException e) {
                 System.out.println("File not found, skipping");
             } catch (InterruptedException e) {
@@ -146,8 +145,7 @@ public class Client {
         return separatedKeyValuePairs;
     }
 
-    public static void reduce(List<List<KeyValuePair<Character, Integer>>> separatedKeyValuePairs, int totalLetters) throws InterruptedException {
-        System.out.println("Reducing input");
+    public static void reduce(List<List<KeyValuePair<Character, Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
         ExecutorService es = Executors.newCachedThreadPool();
         List<ReduceTask> threads = new ArrayList<>();
         for (List<KeyValuePair<Character, Integer>> list : separatedKeyValuePairs) {
@@ -159,8 +157,21 @@ public class Client {
         if (es.awaitTermination(1, TimeUnit.MINUTES)) {
             for (ReduceTask reduceTask1 : threads) {
                 KeyValuePair<Character, Float> kvp = reduceTask1.getResult();
-                System.out.println(kvp.getKey() + " : " + kvp.getValue() + " %");
+                if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
             }
+        }
+    }
+
+    public static void reduceSequential(List<List<KeyValuePair<Character, Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
+        List<ReduceTask> threads = new ArrayList<>();
+        for (List<KeyValuePair<Character, Integer>> list : separatedKeyValuePairs) {
+            ReduceTask reduceTask = new ReduceTask(list, totalLetters);
+            threads.add(reduceTask);
+            reduceTask.run();
+        }
+        for (ReduceTask reduceTask1 : threads) {
+            KeyValuePair<Character, Float> kvp = reduceTask1.getResult();
+            if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
         }
     }
 }
