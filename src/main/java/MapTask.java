@@ -2,32 +2,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MapTask implements Runnable {
-    private String line;
     private final List<KeyValuePair<Character, Integer>> result;
-    private int count;
+    private final int count;
+    private final String[] words;
 
     public MapTask(String line) {
-        this.line = line;
         this.result = new ArrayList<>();
-        this.count = line.length();
+        this.count = line.split(" ").length;
+        this.words = line.toLowerCase().replaceAll("[^\\w\\s\\pL]", "").split(" ");
     }
 
     @Override
     public void run() {
-        this.count = this.line.split(" ").length;
-        this.line = this.line.toLowerCase();
-        this.line = line.replaceAll("[^\\w\\s\\pL]", "");
-
         List<KeyValuePair<Character, Integer>> auxList = new ArrayList<>();
-        for (String word : this.line.split(" ")) {
+        for (String word : this.words) {
             auxList.clear();
             for (char letter : word.toCharArray()) {
-                if(!checkIfKeyValueHasKey(letter, auxList)) {
+                if (!checkIfKeyValueHasKey(letter, auxList)) {
                     auxList.add(new KeyValuePair<>(letter, 1));
                 }
             }
             result.addAll(auxList);
         }
+        auxList = null;
+        System.gc();
     }
 
     private boolean checkIfKeyValueHasKey(char letter, List<KeyValuePair<Character, Integer>> auxList) {
