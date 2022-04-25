@@ -4,7 +4,7 @@ import java.util.List;
 public class MapTask implements Runnable {
     private final List<KeyValuePair<Character, Integer>> result;
     private final int count;
-    private final String[] words;
+    private String[] words;
 
     public MapTask(String line) {
         this.result = new ArrayList<>();
@@ -25,7 +25,6 @@ public class MapTask implements Runnable {
             result.addAll(auxList);
         }
         auxList = null;
-        System.gc();
     }
 
     private boolean checkIfKeyValueHasKey(char letter, List<KeyValuePair<Character, Integer>> auxList) {

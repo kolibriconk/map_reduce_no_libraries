@@ -1,17 +1,15 @@
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class Client {
 
     static final int MAX_CORES = Runtime.getRuntime().availableProcessors() - 1;
-   //static final int BUFFER_SIZE = Integer.MAX_VALUE;// 8 * 1024;
+    //static final int BUFFER_SIZE = 8 * 1024;
 
     public static void main(String[] args) {
         if (args.length != 0) {
@@ -35,7 +33,7 @@ public class Client {
         long finishTime = System.currentTimeMillis();
         System.out.println("Sequential mode takes : " + (finishTime - startTime) + " ms");
 
-        for (int i = 1; i < MAX_CORES; i++) {
+        for (int i = 1; i < 20; i++) {
             startTime = System.currentTimeMillis();
             parallel(files, i, false);
             finishTime = System.currentTimeMillis();
@@ -60,7 +58,6 @@ public class Client {
                     result.addAll(mapTask.getResult());
                     totalWords += mapTask.getCount();
                     mapTask = null;
-                    System.gc();
                 }
 
                 List<List<KeyValuePair<Character, Integer>>> shuffledList = shuffle(result);
@@ -83,33 +80,36 @@ public class Client {
     }
 
     public static void parallel(List<String> files, int threadNumber, boolean usePrint) {
-        System.out.printf("%s:\n", new SimpleDateFormat("HH:mm:ss").format(new Date()));
         for (String file : files) {
             BufferedReader br = null;
             try {
                 List<MapTask> threads = new ArrayList<>();
+
                 ExecutorService es = Executors.newFixedThreadPool(threadNumber);
                 int totalLetters = 0;
                 //Input of the program
                 if (usePrint) System.out.printf("%s:\n", file);
+                long lines = Files.lines(Paths.get(file)).count();
+                long currentLine = 0;
                 br = new BufferedReader(new FileReader(file));
                 String line;
+                List<KeyValuePair<Character, Integer>> result = new ArrayList<>((int) lines);
 
                 while ((line = br.readLine()) != null) {
                     //Executing the map phase
                     MapTask mapTask = new MapTask(line);
                     threads.add(mapTask);
                     es.execute(mapTask);
+                    currentLine++;
+                    System.out.println("Queued " + currentLine + " of a total of " + lines);
                 }
                 es.shutdown();
 
                 if (es.awaitTermination(5, TimeUnit.MINUTES)) {
-                    List<KeyValuePair<Character, Integer>> result = new ArrayList<>();
                     for (MapTask mapTask : threads) {
                         result.addAll(mapTask.getResult());
                         totalLetters += mapTask.getCount();
                         mapTask = null;
-                        System.gc();
                     }
                     List<List<KeyValuePair<Character, Integer>>> shuffledList = shuffle(result);
                     reduce(shuffledList, totalLetters, usePrint);
