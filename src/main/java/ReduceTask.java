@@ -2,22 +2,21 @@ import java.util.List;
 
 public class ReduceTask implements Runnable {
 
-    private List<KeyValuePair<Character, Integer>> keyValuePairs;
-    private KeyValuePair<Character, Float> result;
+    private final KeyValuePair<Character, List<Integer>> keyValuePair;
+    private final KeyValuePair<Character, Float> result;
     private final int divisor;
 
-    public ReduceTask(List<KeyValuePair<Character, Integer>> keyValuePairs, int divisor) {
-        this.keyValuePairs = keyValuePairs;
+    public ReduceTask(KeyValuePair<Character, List<Integer>> keyValuePairs, int divisor) {
+        this.keyValuePair = keyValuePairs;
         this.divisor = divisor;
-        this.result = new KeyValuePair<>(keyValuePairs.get(0).getKey(), 0f);
+        this.result = new KeyValuePair<>(keyValuePairs.getKey(), 0f);
     }
 
     @Override
     public void run() {
-        for (KeyValuePair<Character, Integer> keyValuePair : keyValuePairs) {
-            result.setValue(result.getValue() + keyValuePair.getValue());
+        for (Integer value : keyValuePair.getValue()) {
+            result.setValue(result.getValue() + value);
         }
-
         result.setValue((result.getValue() / divisor) * 100);
     }
 

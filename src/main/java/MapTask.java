@@ -6,7 +6,10 @@ public class MapTask implements Runnable {
     private final int count;
     private String[] words;
 
-    private static final Character[] alphabet = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'à', 'á', 'â', 'ã', 'ä', 'å', 'æ', 'ç', 'è', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð', 'ñ', 'ò', 'ó', 'ô', 'õ', 'ö', 'ø', 'ù', 'ú', 'û', 'ü', 'ý', 'þ', 'ÿ'};
+    private static final Character[] alphabet = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'
+            , 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'à', 'á', 'â', 'ã', 'ä', 'å', 'æ'
+            , 'ç', 'è', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð', 'ñ', 'ò', 'ó', 'ô', 'õ', 'ö', 'ø', 'ù', 'ú', 'û'
+            , 'ü', 'ý', 'þ', 'ÿ'};
 
     private static final List<KeyValuePair<Character, Integer>> alphabetList = new ArrayList<>();
 
@@ -25,11 +28,11 @@ public class MapTask implements Runnable {
     @Override
     public void run() {
         List<Character> auxList = new ArrayList<>();
-        for (int i = 0; i < words.length; i++) {
-            for (int j = 0; j < words[i].length(); j++) {
-                if (!auxList.contains(words[i].charAt(j))) {
-                    result.add(getKeyValuePair(words[i].charAt(j)));
-                    auxList.add(words[i].charAt(j));
+        for (String word : words) {
+            for (int j = 0; j < word.length(); j++) {
+                if (!auxList.contains(word.charAt(j))) {
+                    result.add(getKeyValuePair(word.charAt(j)));
+                    auxList.add(word.charAt(j));
                 }
             }
             auxList.clear();

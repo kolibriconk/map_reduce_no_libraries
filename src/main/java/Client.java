@@ -13,13 +13,13 @@ public class Client {
         if (args.length != 0) {
             List<String> files = Arrays.asList(args);
             //Uncomment this section to execute the comparison
-            //benchmark(files);
+            benchmark(files);
 
             //Uncomment this section to execute the sequential mode
             //sequential(files, true);
 
             //Uncomment this section to execute the parallel mode
-            parallel(files, MAX_CORES, true);
+            //parallel(files, MAX_CORES, true);
         } else {
             System.out.println("No files to process");
         }
@@ -58,7 +58,7 @@ public class Client {
                     mapTask = null;
                 }
 
-                List<List<KeyValuePair<Character, Integer>>> shuffledList = shuffle(result);
+                List<KeyValuePair<Character, List<Integer>>> shuffledList = shuffle(result);
                 reduceSequential(shuffledList, totalWords, usePrint);
 
             } catch (IOException e) {
@@ -102,19 +102,6 @@ public class Client {
                         threads.add(mapTask);
                         es.execute(mapTask);
                         sb.setLength(0);
-                        es.shutdown();
-                        System.out.println("Queued " + currentLine + " of a total of " + lines);
-                        if (es.awaitTermination(5, TimeUnit.MINUTES)) {
-                            for (MapTask mapTask1 : threads) {
-                                for (KeyValuePair<Character, Integer> kvp : mapTask1.getResult()) {
-                                    result.add(kvp);
-                                }
-                                totalLetters += mapTask1.getCount();
-                                mapTask1 = null;
-                            }
-                            threads.clear();
-                            es = Executors.newFixedThreadPool(threadNumber);
-                        }
                     }
                     currentLine++;
                 }
@@ -126,7 +113,7 @@ public class Client {
                         totalLetters += mapTask.getCount();
                         mapTask = null;
                     }
-                    List<List<KeyValuePair<Character, Integer>>> shuffledList = shuffle(result);
+                    List<KeyValuePair<Character, List<Integer>>> shuffledList = shuffle(result);
                     reduce(shuffledList, totalLetters, usePrint);
                 }
             } catch (IOException e) {
@@ -145,16 +132,17 @@ public class Client {
         }
     }
 
-    public static List<List<KeyValuePair<Character, Integer>>> shuffle(List<KeyValuePair<Character, Integer>> result) {
-        List<List<KeyValuePair<Character, Integer>>> separatedKeyValuePairs = new ArrayList<>();
+    public static List<KeyValuePair<Character, List<Integer>>> shuffle(List<KeyValuePair<Character, Integer>> result) {
+        List<KeyValuePair<Character, List<Integer>>> separatedKeyValuePairs = new ArrayList<>();
         List<Character> alreadyAdded = new ArrayList<>();
         for (KeyValuePair<Character, Integer> kvp : result) {
             if (alreadyAdded.contains(kvp.getKey())) {
-                separatedKeyValuePairs.get(alreadyAdded.indexOf(kvp.getKey())).add(kvp);
+                separatedKeyValuePairs.get(alreadyAdded.indexOf(kvp.getKey())).getValue().add(1);
             } else {
                 alreadyAdded.add(kvp.getKey());
-                List<KeyValuePair<Character, Integer>> temp = new ArrayList<>();
-                temp.add(kvp);
+                List<Integer> tempList= new ArrayList<>();
+                tempList.add(1);
+                KeyValuePair<Character, List<Integer>> temp = new KeyValuePair<>(kvp.getKey(), tempList);
                 separatedKeyValuePairs.add(temp);
             }
         }
@@ -162,10 +150,10 @@ public class Client {
         return separatedKeyValuePairs;
     }
 
-    public static void reduce(List<List<KeyValuePair<Character, Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
+    public static void reduce(List<KeyValuePair<Character, List<Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
         ExecutorService es = Executors.newCachedThreadPool();
         List<ReduceTask> threads = new ArrayList<>();
-        for (List<KeyValuePair<Character, Integer>> list : separatedKeyValuePairs) {
+        for (KeyValuePair<Character, List<Integer>> list : separatedKeyValuePairs) {
             ReduceTask reduceTask = new ReduceTask(list, totalLetters);
             threads.add(reduceTask);
             es.execute(reduceTask);
@@ -179,8 +167,8 @@ public class Client {
         }
     }
 
-    public static void reduceSequential(List<List<KeyValuePair<Character, Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
-        for (List<KeyValuePair<Character, Integer>> list : separatedKeyValuePairs) {
+    public static void reduceSequential(List<KeyValuePair<Character, List<Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
+        for (KeyValuePair<Character, List<Integer>> list : separatedKeyValuePairs) {
             ReduceTask reduceTask = new ReduceTask(list, totalLetters);
             reduceTask.run();
             KeyValuePair<Character, Float> kvp = reduceTask.getResult();
