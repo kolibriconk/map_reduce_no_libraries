@@ -6,6 +6,16 @@ public class MapTask implements Runnable {
     private final int count;
     private String[] words;
 
+    private static final Character[] alphabet = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'à', 'á', 'â', 'ã', 'ä', 'å', 'æ', 'ç', 'è', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð', 'ñ', 'ò', 'ó', 'ô', 'õ', 'ö', 'ø', 'ù', 'ú', 'û', 'ü', 'ý', 'þ', 'ÿ'};
+
+    private static final List<KeyValuePair<Character, Integer>> alphabetList = new ArrayList<>();
+
+    static {
+        for (Character c : alphabet) {
+            alphabetList.add(new KeyValuePair<>(c, 1));
+        }
+    }
+
     public MapTask(String line) {
         this.result = new ArrayList<>();
         this.count = line.split(" ").length;
@@ -14,24 +24,18 @@ public class MapTask implements Runnable {
 
     @Override
     public void run() {
-        List<KeyValuePair<Character, Integer>> auxList = new ArrayList<>();
-        for (String word : this.words) {
-            auxList.clear();
-            for (char letter : word.toCharArray()) {
-                if (!checkIfKeyValueHasKey(letter, auxList)) {
-                    auxList.add(new KeyValuePair<>(letter, 1));
+        List<Character> auxList = new ArrayList<>();
+        for (int i = 0; i < words.length; i++) {
+            for (int j = 0; j < words[i].length(); j++) {
+                if (!auxList.contains(words[i].charAt(j))) {
+                    result.add(getKeyValuePair(words[i].charAt(j)));
+                    auxList.add(words[i].charAt(j));
                 }
             }
-            result.addAll(auxList);
+            auxList.clear();
         }
+        this.words = null;
         auxList = null;
-    }
-
-    private boolean checkIfKeyValueHasKey(char letter, List<KeyValuePair<Character, Integer>> auxList) {
-        for (KeyValuePair<Character, Integer> pair : auxList) {
-            if (pair.getKey() == letter) return true;
-        }
-        return false;
     }
 
     public List<KeyValuePair<Character, Integer>> getResult() {
@@ -40,5 +44,12 @@ public class MapTask implements Runnable {
 
     public int getCount() {
         return count;
+    }
+
+    private KeyValuePair<Character, Integer> getKeyValuePair(Character letter) {
+        for (KeyValuePair<Character, Integer> pair : alphabetList) {
+            if (pair.getKey() == letter) return pair;
+        }
+        return new KeyValuePair<>(letter, 1);
     }
 }

@@ -1,14 +1,12 @@
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 
 public class Client {
 
-    static final int MAX_CORES = Runtime.getRuntime().availableProcessors() - 1;
+    static final int MAX_CORES = Runtime.getRuntime().availableProcessors();
     //static final int BUFFER_SIZE = 8 * 1024;
 
     public static void main(String[] args) {
@@ -33,7 +31,7 @@ public class Client {
         long finishTime = System.currentTimeMillis();
         System.out.println("Sequential mode takes : " + (finishTime - startTime) + " ms");
 
-        for (int i = 1; i < 20; i++) {
+        for (int i = 1; i < MAX_CORES; i++) {
             startTime = System.currentTimeMillis();
             parallel(files, i, false);
             finishTime = System.currentTimeMillis();
@@ -95,13 +93,30 @@ public class Client {
                 String line;
                 List<KeyValuePair<Character, Integer>> result = new ArrayList<>((int) lines);
 
+                StringBuilder sb = new StringBuilder();
                 while ((line = br.readLine()) != null) {
-                    //Executing the map phase
-                    MapTask mapTask = new MapTask(line);
-                    threads.add(mapTask);
-                    es.execute(mapTask);
+                    sb.append(line).append(" ");
+                    if (currentLine % 1000 == 0 && currentLine != 0 || lines - currentLine <= 1000) {
+                        //Executing the map phase
+                        MapTask mapTask = new MapTask(sb.toString());
+                        threads.add(mapTask);
+                        es.execute(mapTask);
+                        sb.setLength(0);
+                        es.shutdown();
+                        System.out.println("Queued " + currentLine + " of a total of " + lines);
+                        if (es.awaitTermination(5, TimeUnit.MINUTES)) {
+                            for (MapTask mapTask1 : threads) {
+                                for (KeyValuePair<Character, Integer> kvp : mapTask1.getResult()) {
+                                    result.add(kvp);
+                                }
+                                totalLetters += mapTask1.getCount();
+                                mapTask1 = null;
+                            }
+                            threads.clear();
+                            es = Executors.newFixedThreadPool(threadNumber);
+                        }
+                    }
                     currentLine++;
-                    System.out.println("Queued " + currentLine + " of a total of " + lines);
                 }
                 es.shutdown();
 
