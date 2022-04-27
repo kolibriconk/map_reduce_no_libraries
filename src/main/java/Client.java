@@ -52,9 +52,9 @@ public class Client {
                 while ((line = br.readLine()) != null) {
                     //Executing the map phase
                     MapTask mapTask = new MapTask(line);
-                    mapTask.run();
-                    result.addAll(mapTask.getResult());
-                    totalWords += mapTask.getCount();
+                    KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>> resultCalled =  mapTask.call();
+                    result.addAll(resultCalled.getValue());
+                    totalWords += resultCalled.getKey();
                     mapTask = null;
                 }
 
@@ -81,8 +81,6 @@ public class Client {
         for (String file : files) {
             BufferedReader br = null;
             try {
-                List<MapTask> threads = new ArrayList<>();
-
                 ExecutorService es = Executors.newFixedThreadPool(threadNumber);
                 int totalLetters = 0;
                 //Input of the program
@@ -94,32 +92,43 @@ public class Client {
                 List<KeyValuePair<Character, Integer>> result = new ArrayList<>((int) lines);
 
                 StringBuilder sb = new StringBuilder();
+
+                List<Future<KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>>> futures = new ArrayList<>();
+
                 while ((line = br.readLine()) != null) {
-                    sb.append(line).append(" ");
-                    if (currentLine % 1000 == 0 && currentLine != 0 || lines - currentLine <= 1000) {
+                    sb.append(line)
+                            .append(" ");
+                    if (currentLine % 500 == 0 && currentLine != 0 || lines - currentLine <= 500) {
                         //Executing the map phase
                         MapTask mapTask = new MapTask(sb.toString());
-                        threads.add(mapTask);
-                        es.execute(mapTask);
                         sb.setLength(0);
+                        futures.add(es.submit(mapTask));
+                        //System.out.println("Queued " + currentLine + " from " + lines);
                     }
                     currentLine++;
                 }
                 es.shutdown();
-
+                //System.out.println("Waiting for threads to finish");
                 if (es.awaitTermination(5, TimeUnit.MINUTES)) {
-                    for (MapTask mapTask : threads) {
-                        result.addAll(mapTask.getResult());
-                        totalLetters += mapTask.getCount();
-                        mapTask = null;
+                    System.gc();
+                    //System.out.println("All threads finished, merging results");
+                    for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>> future : futures) {
+                        for (KeyValuePair<Character, Integer> pair : future.get().getValue()) {
+                            result.add(pair);
+                        }
+                        totalLetters += future.get().getKey();
                     }
+                    //System.out.println("Beginning shuffle");
                     List<KeyValuePair<Character, List<Integer>>> shuffledList = shuffle(result);
+                    //System.out.println("Beginning reduce");
                     reduce(shuffledList, totalLetters, usePrint);
                 }
             } catch (IOException e) {
                 System.out.println("File not found, skipping");
             } catch (InterruptedException e) {
                 e.printStackTrace();
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e);
             } finally {
                 if (br != null) {
                     try {
@@ -140,7 +149,7 @@ public class Client {
                 separatedKeyValuePairs.get(alreadyAdded.indexOf(kvp.getKey())).getValue().add(1);
             } else {
                 alreadyAdded.add(kvp.getKey());
-                List<Integer> tempList= new ArrayList<>();
+                List<Integer> tempList = new ArrayList<>();
                 tempList.add(1);
                 KeyValuePair<Character, List<Integer>> temp = new KeyValuePair<>(kvp.getKey(), tempList);
                 separatedKeyValuePairs.add(temp);

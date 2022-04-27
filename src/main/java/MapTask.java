@@ -1,10 +1,10 @@
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 
-public class MapTask implements Runnable {
-    private final List<KeyValuePair<Character, Integer>> result;
-    private final int count;
-    private String[] words;
+public class MapTask implements Callable<KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>> {
+    private String input;
 
     private static final Character[] alphabet = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'
             , 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'à', 'á', 'â', 'ã', 'ä', 'å', 'æ'
@@ -19,15 +19,24 @@ public class MapTask implements Runnable {
         }
     }
 
-    public MapTask(String line) {
-        this.result = new ArrayList<>();
-        this.count = line.split(" ").length;
-        this.words = line.toLowerCase().replaceAll("[^\\w\\s\\pL]", "").split(" ");
+    public MapTask(String input) {
+        this.input = input;
+    }
+
+    private KeyValuePair<Character, Integer> getKeyValuePair(Character letter) {
+        for (KeyValuePair<Character, Integer> pair : alphabetList) {
+            if (pair.getKey() == letter) return pair;
+        }
+        return new KeyValuePair<>(letter, 1);
     }
 
     @Override
-    public void run() {
+    public KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>> call() {
+        int count = input.split(" ").length;
+        String[] words = input.toLowerCase().replaceAll("[^\\w\\s\\pL]", "").split(" ");
+        input = null;
         List<Character> auxList = new ArrayList<>();
+        List<KeyValuePair<Character, Integer>> result = new ArrayList<>();
         for (String word : words) {
             for (int j = 0; j < word.length(); j++) {
                 if (!auxList.contains(word.charAt(j))) {
@@ -37,22 +46,8 @@ public class MapTask implements Runnable {
             }
             auxList.clear();
         }
-        this.words = null;
+        words = null;
         auxList = null;
-    }
-
-    public List<KeyValuePair<Character, Integer>> getResult() {
-        return result;
-    }
-
-    public int getCount() {
-        return count;
-    }
-
-    private KeyValuePair<Character, Integer> getKeyValuePair(Character letter) {
-        for (KeyValuePair<Character, Integer> pair : alphabetList) {
-            if (pair.getKey() == letter) return pair;
-        }
-        return new KeyValuePair<>(letter, 1);
+        return new KeyValuePair<>(count, result);
     }
 }
