@@ -1,4 +1,6 @@
-public class KeyValuePair<T,R> {
+import java.io.Serializable;
+
+public class KeyValuePair<T,R> implements Serializable {
     private final T key;
     private R value;
 
