@@ -30,6 +30,18 @@ public class Client {
         } else {
             System.out.println("No files to process");
         }
+
+        try {
+            File tempDir = new File("temp");
+            File[] tempFiles = tempDir.listFiles();
+            for (File tempFile : tempFiles) {
+                tempFile.delete();
+            }
+            tempDir.delete();
+        } catch (Exception e) {
+            System.out.println("Cannot delete the temp directory");
+        }
+
     }
 
     private static void benchmark(List<String> files) {
@@ -55,11 +67,11 @@ public class Client {
                 if (usePrint) System.out.printf("%s:\n", file);
                 br = new BufferedReader(new FileReader(file));
                 String line;
-                List<KeyValuePair<Character, Integer>> result = new ArrayList<>();
+                List<KeyValuePair<Character, List<Integer>>> result = new ArrayList<>();
                 while ((line = br.readLine()) != null) {
                     //Executing the map phase
                     MapTask mapTask = new MapTask(line);
-                    KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>> resultCalled = mapTask.call();
+                    KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> resultCalled = mapTask.call();
                     result.addAll(resultCalled.getValue());
                     totalWords += resultCalled.getKey();
                     mapTask = null;
@@ -97,16 +109,16 @@ public class Client {
                 int fileCounter = 0;
                 br = new BufferedReader(new FileReader(file));
                 String line;
-                List<KeyValuePair<Character, Integer>> result = new ArrayList<>((int) lines);
+                List<KeyValuePair<Character, List<Integer>>> result = new ArrayList<>((int) lines);
 
                 StringBuilder sb = new StringBuilder();
 
-                List<Future<KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>>> futures = new ArrayList<>();
+                List<Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>>> futures = new ArrayList<>();
 
                 while ((line = br.readLine()) != null) {
                     sb.append(line)
                             .append(" ");
-                    if (currentLine % 1000 == 0 && currentLine != 0 || lines - currentLine <= 1000) {
+                    if (currentLine % 100000 == 0 && currentLine != 0 || lines - currentLine <= 100000) {
                         //Executing the map phase
                         MapTask mapTask = new MapTask(sb.toString());
                         sb.setLength(0);
@@ -114,73 +126,84 @@ public class Client {
                         System.out.println("Queued " + currentLine + " from " + lines);
                     }
                     currentLine++;
-                    if (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() > MAX_MEMORY_THRESHOLD) {
-                        //System.out.println("Memory limit reached, waiting for tasks to finish");
+                    if (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() > MAX_MEMORY_THRESHOLD || (lines - currentLine <= 100000)) {
+                        System.out.println("Memory limit reached, waiting for tasks to finish");
                         es.shutdown();
                         if (es.awaitTermination(5, TimeUnit.MINUTES)) {
-                            List<Future<KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>>> futuresSubList =
-                                    futures.subList(0, futures.size()/2);
-                            File outFile = new File("temp/temp" + fileCounter + ".txt");
-                            try (FileOutputStream fos = new FileOutputStream(outFile, true)) {
-                                BufferedOutputStream bos = new BufferedOutputStream(fos);
-                                ObjectOutputStream oos = new ObjectOutputStream(bos);
-                                for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>> future : futuresSubList) {
-                                    oos.writeObject(future.get());
-                                }
-                                oos.flush();
-                                oos.close();
-                                bos.flush();
-                                bos.close();
-                            } catch (IOException e) {
-                                System.out.println("Cannot write to file");
-                            }
-                            fileCounter++;
-                            futures.removeAll(futuresSubList);
-                            //futures.clear();
-                            es = Executors.newFixedThreadPool(threadNumber);
-                        }
-                    }
+                            for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> future : futures) {
+                                KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> futureResult = future.get();
+                                totalLetters += futureResult.getKey();
 
-                }
-                es.shutdown();
-                System.out.println("Waiting for threads to finish");
-                if (es.awaitTermination(5, TimeUnit.MINUTES)) {
-                    System.out.println("All threads finished, merging results");
-                    for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>> future : futures) {
-                        result.addAll(future.get().getValue());
-                        totalLetters += future.get().getKey();
-                    }
-                    futures.clear();
-                    System.out.println("Beginning shuffle");
-                    List<KeyValuePair<Character, List<Integer>>> shuffledList = shuffle(result, new ArrayList<>());
-                    result.clear();
-
-                    for (int i = 0; i < fileCounter; i++) {
-                        File tempFile = new File("temp/temp"+i+".txt");
-                        if (tempFile.exists()) {
-                            List<KeyValuePair<Character, Integer>> tempResult = new ArrayList<>();
-                            //read objects from temp file
-                            try (FileInputStream fis = new FileInputStream(tempFile);
-                                 BufferedInputStream bis = new BufferedInputStream(fis);
-                                 ObjectInputStream ois = new ObjectInputStream(bis)) {
-                                while (bis.available() > 0) {
-                                    //KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>> temp = (KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>) ois.readObject();
-                                    Object object = ois.readObject();
-                                    if (object instanceof KeyValuePair<?, ?>) {
-                                        KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>> parsedObject = (KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>) object;
-                                        tempResult.addAll(parsedObject.getValue());
-                                        totalLetters += parsedObject.getKey();
+                                for (KeyValuePair<Character, List<Integer>> pair : futureResult.getValue()) {
+                                    File outFile = new File("temp/temp" + pair.getKey() + ".txt");
+                                    if (outFile.createNewFile()) {
+                                        FileOutputStream fos = new FileOutputStream(outFile, true);
+                                        BufferedOutputStream bos = new BufferedOutputStream(fos);
+                                        ObjectOutputStream oos = new ObjectOutputStream(bos);
+                                        oos.writeObject(pair);
+                                    } else {
+                                        FileOutputStream fos = new FileOutputStream(outFile, true);
+                                        BufferedOutputStream bos = new BufferedOutputStream(fos);
+                                        ObjectOutputStream oos = new CustomObjectOutputStream(bos);
+                                        oos.writeObject(pair);
                                     }
                                 }
-                                shuffle(tempResult, shuffledList);
-                            } catch (ClassNotFoundException e) {
-                                throw new RuntimeException(e);
+                            }
+                            futures.clear();
+                            if (!(lines - currentLine <= 100000)) {
+                                es = Executors.newFixedThreadPool(threadNumber);
                             }
                         }
                     }
-                    //System.out.println("Beginning reduce");
-                    reduce(shuffledList, totalLetters, usePrint);
                 }
+                //Shuffle results from files and rearrange
+                //shuffle(tempResult, shuffledList);
+                //MAYBE WE HAVE TO SHUFFLE DIRECTLY FROM FILES
+
+                //Reduce phase
+                //reduce(shuffledList, totalLetters, usePrint);
+
+
+
+//                es.shutdown();
+//                System.out.println("Waiting for threads to finish");
+//                if (es.awaitTermination(5, TimeUnit.MINUTES)) {
+//                    System.out.println("All threads finished, merging results");
+//                    for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> future : futures) {
+//                        result.addAll(future.get().getValue());
+//                        totalLetters += future.get().getKey();
+//                    }
+//                    futures.clear();
+//                    System.out.println("Beginning shuffle");
+//                    List<KeyValuePair<Character, List<Integer>>> shuffledList = shuffle(result, new ArrayList<>());
+//                    result.clear();
+//
+//                    for (int i = 0; i < fileCounter; i++) {
+//                        File tempFile = new File("temp/temp" + i + ".txt");
+//                        if (tempFile.exists()) {
+//                            List<KeyValuePair<Character, List<Integer>>> tempResult = new ArrayList<>();
+//                            //read objects from temp file
+//                            try (FileInputStream fis = new FileInputStream(tempFile);
+//                                 BufferedInputStream bis = new BufferedInputStream(fis);
+//                                 ObjectInputStream ois = new ObjectInputStream(bis)) {
+//                                while (bis.available() > 0) {
+//                                    //KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>> temp = (KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>) ois.readObject();
+//                                    Object object = ois.readObject();
+//                                    if (object instanceof KeyValuePair<?, ?>) {
+//                                        KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> parsedObject = (KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>) object;
+//                                        tempResult.addAll(parsedObject.getValue());
+//                                        totalLetters += parsedObject.getKey();
+//                                    }
+//                                }
+//                                shuffle(tempResult, shuffledList);
+//                            } catch (ClassNotFoundException e) {
+//                                throw new RuntimeException(e);
+//                            }
+//                        }
+//                    }
+//                    //System.out.println("Beginning reduce");
+//                    reduce(shuffledList, totalLetters, usePrint);
+//                }
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {
@@ -197,9 +220,9 @@ public class Client {
         }
     }
 
-    public static List<KeyValuePair<Character, List<Integer>>> shuffle(List<KeyValuePair<Character, Integer>> partialMapResult, List<KeyValuePair<Character, List<Integer>>> partialResult) {
+    public static List<KeyValuePair<Character, List<Integer>>> shuffle(List<KeyValuePair<Character, List<Integer>>> partialMapResult, List<KeyValuePair<Character, List<Integer>>> partialResult) {
         List<Character> alreadyAdded = new ArrayList<>();
-        for (KeyValuePair<Character, Integer> kvp : partialMapResult) {
+        for (KeyValuePair<Character, List<Integer>> kvp : partialMapResult) {
             if (alreadyAdded.contains(kvp.getKey())) {
                 partialResult.get(alreadyAdded.indexOf(kvp.getKey())).getValue().add(1);
             } else {

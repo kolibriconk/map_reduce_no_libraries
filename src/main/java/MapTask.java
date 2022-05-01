@@ -3,7 +3,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-public class MapTask implements Callable<KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>> {
+public class MapTask implements Callable<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> {
     private String input;
 
     private static final Character[] alphabet = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'
@@ -11,11 +11,13 @@ public class MapTask implements Callable<KeyValuePair<Integer, List<KeyValuePair
             , 'ç', 'è', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð', 'ñ', 'ò', 'ó', 'ô', 'õ', 'ö', 'ø', 'ù', 'ú', 'û'
             , 'ü', 'ý', 'þ', 'ÿ'};
 
-    private static final List<KeyValuePair<Character, Integer>> alphabetList = new ArrayList<>();
+    private static final List<KeyValuePair<Character, List<Integer>>> alphabetList = new ArrayList<>();
 
     static {
         for (Character c : alphabet) {
-            alphabetList.add(new KeyValuePair<>(c, 1));
+            KeyValuePair<Character, List<Integer>> pair = new KeyValuePair<>(c, new ArrayList<>());
+            pair.getValue().add(1);
+            alphabetList.add(pair);
         }
     }
 
@@ -23,20 +25,22 @@ public class MapTask implements Callable<KeyValuePair<Integer, List<KeyValuePair
         this.input = input;
     }
 
-    private KeyValuePair<Character, Integer> getKeyValuePair(Character letter) {
-        for (KeyValuePair<Character, Integer> pair : alphabetList) {
+    private KeyValuePair<Character, List<Integer>> getKeyValuePair(Character letter) {
+        for (KeyValuePair<Character, List<Integer>> pair : alphabetList) {
             if (pair.getKey() == letter) return pair;
         }
-        return new KeyValuePair<>(letter, 1);
+        KeyValuePair<Character, List<Integer>> pair = new KeyValuePair<>(letter, new ArrayList<>());
+        pair.getValue().add(1);
+        return pair;
     }
 
     @Override
-    public KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>> call() {
+    public KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> call() {
         int count = input.split(" ").length;
         String[] words = input.toLowerCase().replaceAll("[^\\w\\s\\pL]", "").split(" ");
         input = null;
         List<Character> auxList = new ArrayList<>();
-        List<KeyValuePair<Character, Integer>> result = new ArrayList<>();
+        List<KeyValuePair<Character, List<Integer>>> result = new ArrayList<>();
         for (String word : words) {
             for (int j = 0; j < word.length(); j++) {
                 if (!auxList.contains(word.charAt(j))) {
