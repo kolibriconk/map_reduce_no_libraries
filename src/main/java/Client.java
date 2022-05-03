@@ -26,7 +26,10 @@ public class Client {
             //sequential(files, true);
 
             //Uncomment this section to execute the parallel mode
+            long startTime = System.currentTimeMillis();
             parallel(files, MAX_CORES, true);
+            long finishTime = System.currentTimeMillis();
+            System.out.println("Total time taken : " + (finishTime - startTime) + " ms");
         } else {
             System.out.println("No files to process");
         }
@@ -60,39 +63,39 @@ public class Client {
 
     public static void sequential(List<String> files, boolean usePrint) {
         for (String file : files) {
-            BufferedReader br = null;
-            try {
-                int totalWords = 0;
-                //Input of the program
-                if (usePrint) System.out.printf("%s:\n", file);
-                br = new BufferedReader(new FileReader(file));
-                String line;
-                List<KeyValuePair<Character, List<Integer>>> result = new ArrayList<>();
-                while ((line = br.readLine()) != null) {
-                    //Executing the map phase
-                    MapTask mapTask = new MapTask(line);
-                    KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> resultCalled = mapTask.call();
-                    result.addAll(resultCalled.getValue());
-                    totalWords += resultCalled.getKey();
-                    mapTask = null;
-                }
-
-                List<KeyValuePair<Character, List<Integer>>> shuffledList = shuffle(result, new ArrayList<>());
-                reduceSequential(shuffledList, totalWords, usePrint);
-
-            } catch (IOException e) {
-                System.out.println("File not found, skipping");
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } finally {
-                if (br != null) {
-                    try {
-                        br.close();
-                    } catch (IOException e) {
-                        System.out.println("Cannot close the buffered reader");
-                    }
-                }
-            }
+//            BufferedReader br = null;
+//            try {
+//                int totalWords = 0;
+//                //Input of the program
+//                if (usePrint) System.out.printf("%s:\n", file);
+//                br = new BufferedReader(new FileReader(file));
+//                String line;
+//                List<KeyValuePair<Character, List<Integer>>> result = new ArrayList<>();
+//                while ((line = br.readLine()) != null) {
+//                    //Executing the map phase
+//                    MapTask mapTask = new MapTask(line);
+//                    KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> resultCalled = mapTask.call();
+//                    result.addAll(resultCalled.getValue());
+//                    totalWords += resultCalled.getKey();
+//                    mapTask = null;
+//                }
+//
+//                List<KeyValuePair<Character, List<Integer>>> shuffledList = shuffle(result, new ArrayList<>());
+//                reduceSequential(shuffledList, totalWords, usePrint);
+//
+//            } catch (IOException e) {
+//                System.out.println("File not found, skipping");
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            } finally {
+//                if (br != null) {
+//                    try {
+//                        br.close();
+//                    } catch (IOException e) {
+//                        System.out.println("Cannot close the buffered reader");
+//                    }
+//                }
+//            }
         }
     }
 
@@ -101,7 +104,7 @@ public class Client {
             BufferedReader br = null;
             try {
                 ExecutorService es = Executors.newFixedThreadPool(threadNumber);
-                int totalLetters = 0;
+                int totalWords = 0;
                 //Input of the program
                 if (usePrint) System.out.printf("%s:\n", file);
                 long lines = Files.lines(Paths.get(file)).count();
@@ -118,95 +121,52 @@ public class Client {
                 while ((line = br.readLine()) != null) {
                     sb.append(line)
                             .append(" ");
-                    if (currentLine % 100000 == 0 && currentLine != 0 || lines - currentLine <= 100000) {
+                    currentLine++;
+                    if (currentLine % 50000 == 0 && currentLine != 0 || lines == currentLine) {
                         //Executing the map phase
                         MapTask mapTask = new MapTask(sb.toString());
                         sb.setLength(0);
                         futures.add(es.submit(mapTask));
                         System.out.println("Queued " + currentLine + " from " + lines);
                     }
-                    currentLine++;
-                    if (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() > MAX_MEMORY_THRESHOLD || (lines - currentLine <= 100000)) {
+                    if (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() > MAX_MEMORY_THRESHOLD || (lines == currentLine)) {
                         System.out.println("Memory limit reached, waiting for tasks to finish");
                         es.shutdown();
                         if (es.awaitTermination(5, TimeUnit.MINUTES)) {
-                            for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> future : futures) {
-                                KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> futureResult = future.get();
-                                totalLetters += futureResult.getKey();
+                            if (futures.size() > 0) {
+                                File outFile = new File("temp/temp_" + fileCounter + ".txt");
+                                FileOutputStream fos = new FileOutputStream(outFile, true);
+                                BufferedOutputStream bos = new BufferedOutputStream(fos);
+                                ObjectOutputStream oos = new ObjectOutputStream(bos);
 
-                                for (KeyValuePair<Character, List<Integer>> pair : futureResult.getValue()) {
-                                    File outFile = new File("temp/temp" + pair.getKey() + ".txt");
-                                    if (outFile.createNewFile()) {
-                                        FileOutputStream fos = new FileOutputStream(outFile, true);
-                                        BufferedOutputStream bos = new BufferedOutputStream(fos);
-                                        ObjectOutputStream oos = new ObjectOutputStream(bos);
-                                        oos.writeObject(pair);
-                                    } else {
-                                        FileOutputStream fos = new FileOutputStream(outFile, true);
-                                        BufferedOutputStream bos = new BufferedOutputStream(fos);
-                                        ObjectOutputStream oos = new CustomObjectOutputStream(bos);
-                                        oos.writeObject(pair);
-                                    }
+                                for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> future : futures) {
+                                    KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> futureResult = future.get();
+                                    totalWords += futureResult.getKey();
+                                    oos.writeObject(futureResult.getValue());
+                                    futureResult = null;
                                 }
+                                oos.flush();
+                                oos.close();
+                                bos.flush();
+                                bos.close();
+                                fos.flush();
+                                fos.close();
+                                fileCounter++;
+                                futures.clear();
                             }
-                            futures.clear();
-                            if (!(lines - currentLine <= 100000)) {
+                            if (lines != currentLine) {
                                 es = Executors.newFixedThreadPool(threadNumber);
                             }
                         }
                     }
                 }
-                //Shuffle results from files and rearrange
-                //shuffle(tempResult, shuffledList);
-                //MAYBE WE HAVE TO SHUFFLE DIRECTLY FROM FILES
 
-                //Reduce phase
-                //reduce(shuffledList, totalLetters, usePrint);
+                List<Character> alreadyAdded = shuffle(fileCounter);
 
-
-
-//                es.shutdown();
-//                System.out.println("Waiting for threads to finish");
-//                if (es.awaitTermination(5, TimeUnit.MINUTES)) {
-//                    System.out.println("All threads finished, merging results");
-//                    for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> future : futures) {
-//                        result.addAll(future.get().getValue());
-//                        totalLetters += future.get().getKey();
-//                    }
-//                    futures.clear();
-//                    System.out.println("Beginning shuffle");
-//                    List<KeyValuePair<Character, List<Integer>>> shuffledList = shuffle(result, new ArrayList<>());
-//                    result.clear();
-//
-//                    for (int i = 0; i < fileCounter; i++) {
-//                        File tempFile = new File("temp/temp" + i + ".txt");
-//                        if (tempFile.exists()) {
-//                            List<KeyValuePair<Character, List<Integer>>> tempResult = new ArrayList<>();
-//                            //read objects from temp file
-//                            try (FileInputStream fis = new FileInputStream(tempFile);
-//                                 BufferedInputStream bis = new BufferedInputStream(fis);
-//                                 ObjectInputStream ois = new ObjectInputStream(bis)) {
-//                                while (bis.available() > 0) {
-//                                    //KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>> temp = (KeyValuePair<Integer, List<KeyValuePair<Character, Integer>>>) ois.readObject();
-//                                    Object object = ois.readObject();
-//                                    if (object instanceof KeyValuePair<?, ?>) {
-//                                        KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> parsedObject = (KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>) object;
-//                                        tempResult.addAll(parsedObject.getValue());
-//                                        totalLetters += parsedObject.getKey();
-//                                    }
-//                                }
-//                                shuffle(tempResult, shuffledList);
-//                            } catch (ClassNotFoundException e) {
-//                                throw new RuntimeException(e);
-//                            }
-//                        }
-//                    }
-//                    //System.out.println("Beginning reduce");
-//                    reduce(shuffledList, totalLetters, usePrint);
-//                }
+                reduce(totalWords, alreadyAdded, threadNumber, usePrint);
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
-            } catch (ExecutionException e) {
+            } catch (ExecutionException | ClassNotFoundException e) {
                 throw new RuntimeException(e);
             } finally {
                 if (br != null) {
@@ -220,45 +180,79 @@ public class Client {
         }
     }
 
-    public static List<KeyValuePair<Character, List<Integer>>> shuffle(List<KeyValuePair<Character, List<Integer>>> partialMapResult, List<KeyValuePair<Character, List<Integer>>> partialResult) {
+    static List<BufferedWriter> bufferedOutputStreams = new ArrayList<>();
+
+    private static List<Character> shuffle(int fileCounter) throws IOException, ClassNotFoundException {
         List<Character> alreadyAdded = new ArrayList<>();
-        for (KeyValuePair<Character, List<Integer>> kvp : partialMapResult) {
-            if (alreadyAdded.contains(kvp.getKey())) {
-                partialResult.get(alreadyAdded.indexOf(kvp.getKey())).getValue().add(1);
-            } else {
-                alreadyAdded.add(kvp.getKey());
-                List<Integer> tempList = new ArrayList<>();
-                tempList.add(1);
-                KeyValuePair<Character, List<Integer>> temp = new KeyValuePair<>(kvp.getKey(), tempList);
-                partialResult.add(temp);
+        for (int i = 0; i < fileCounter; i++) {
+            File inFile = new File("temp/temp_" + i + ".txt");
+            System.out.println("Processing file " + inFile.getName());
+            if (inFile.exists()) {
+                FileInputStream fos = new FileInputStream(inFile);
+                BufferedInputStream bos = new BufferedInputStream(fos);
+                ObjectInputStream oos = new ObjectInputStream(bos);
+                while (bos.available() > 0) {
+                    Object o = oos.readObject();
+                    if (o instanceof List<?>) {
+                        List<KeyValuePair<Character, List<Integer>>> parsedObject = (List<KeyValuePair<Character, List<Integer>>>) o;
+                        for (KeyValuePair<Character, List<Integer>> pair : parsedObject) {
+                            checkAndAdd(alreadyAdded, pair);
+                        }
+                    }
+                }
             }
         }
-        return partialResult;
+
+        System.out.println("Shuffle finished initiating stream closed");
+
+        for (BufferedWriter bufferedOutputStream : bufferedOutputStreams) {
+            bufferedOutputStream.flush();
+            bufferedOutputStream.close();
+        }
+
+        System.out.println("Closed all streams");
+
+        return alreadyAdded;
     }
 
-    public static void reduce(List<KeyValuePair<Character, List<Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
-        ExecutorService es = Executors.newCachedThreadPool();
-        List<ReduceTask> threads = new ArrayList<>();
-        for (KeyValuePair<Character, List<Integer>> list : separatedKeyValuePairs) {
-            ReduceTask reduceTask = new ReduceTask(list, totalLetters);
-            threads.add(reduceTask);
-            es.execute(reduceTask);
+    private static void checkAndAdd(List<Character> alreadyAdded, KeyValuePair<Character, List<Integer>> pair) throws IOException {
+        if (!alreadyAdded.contains(pair.getKey())) {
+            alreadyAdded.add(pair.getKey());
+            int index = alreadyAdded.indexOf(pair.getKey());
+            File outFile = new File("temp/temp_shuffled_" + index + ".txt");
+            BufferedWriter bos = new BufferedWriter(new FileWriter(outFile, true));
+            bufferedOutputStreams.add(bos);
+        }
+        int index = alreadyAdded.indexOf(pair.getKey());
+        BufferedWriter bos = bufferedOutputStreams.get(index);
+        bos.write(pair.getValue().get(0));
+        bos.write('\n');
+    }
+
+    public static void reduce(int totalWords, List<Character> alreadyAdded, int threadNumber, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
+        List<Future<KeyValuePair<Character, Float>>> futures = new ArrayList<>();
+        ExecutorService es = Executors.newFixedThreadPool(threadNumber);
+        for (int i = 0; i < alreadyAdded.size(); i++) {
+            String fileName = "temp/temp_shuffled_" + i + ".txt";
+            ReduceTask reduceTask = new ReduceTask(fileName, totalWords, alreadyAdded.get(i));
+            futures.add(es.submit(reduceTask));
         }
         es.shutdown();
-        if (es.awaitTermination(5, TimeUnit.MINUTES)) {
-            for (ReduceTask reduceTask1 : threads) {
-                KeyValuePair<Character, Float> kvp = reduceTask1.getResult();
-                if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
+
+        if (es.awaitTermination(15, TimeUnit.MINUTES) && usePrint) {
+            for (Future<KeyValuePair<Character, Float>> future : futures) {
+                KeyValuePair<Character, Float> kvp = future.get();
+                System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
             }
         }
     }
 
-    public static void reduceSequential(List<KeyValuePair<Character, List<Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
-        for (KeyValuePair<Character, List<Integer>> list : separatedKeyValuePairs) {
-            ReduceTask reduceTask = new ReduceTask(list, totalLetters);
-            reduceTask.run();
-            KeyValuePair<Character, Float> kvp = reduceTask.getResult();
-            if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
-        }
-    }
+//    public static void reduceSequential(List<KeyValuePair<Character, List<Integer>>> separatedKeyValuePairs, int totalLetters, boolean usePrint) throws InterruptedException {
+//        for (KeyValuePair<Character, List<Integer>> list : separatedKeyValuePairs) {
+//            ReduceTask reduceTask = new ReduceTask(list, totalLetters);
+//            reduceTask.run();
+//            KeyValuePair<Character, Float> kvp = reduceTask.getResult();
+//            if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
+//        }
+//    }
 }

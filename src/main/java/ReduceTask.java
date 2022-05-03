@@ -1,26 +1,48 @@
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.Callable;
 
-public class ReduceTask implements Runnable {
+public class ReduceTask implements Callable<KeyValuePair<Character, Float>> {
+    private final String inputFilePath;
+    private final long divisor;
+    private final char key;
 
-    private final KeyValuePair<Character, List<Integer>> keyValuePair;
-    private final KeyValuePair<Character, Float> result;
-    private final int divisor;
-
-    public ReduceTask(KeyValuePair<Character, List<Integer>> keyValuePairs, int divisor) {
-        this.keyValuePair = keyValuePairs;
+    public ReduceTask(String inputFilePath, long divisor, char key) {
+        this.inputFilePath = inputFilePath;
         this.divisor = divisor;
-        this.result = new KeyValuePair<>(keyValuePairs.getKey(), 0f);
+        this.key = key;
     }
 
     @Override
-    public void run() {
-        for (Integer value : keyValuePair.getValue()) {
-            result.setValue(result.getValue() + value);
-        }
-        result.setValue((result.getValue() / divisor) * 100);
-    }
+    public KeyValuePair<Character, Float> call() throws Exception {
+        KeyValuePair<Character, Float> result = null;
+        //File inFile = new File(inputFilePath);
+        float lines = Files.lines(Paths.get(inputFilePath)).count();
+        result = new KeyValuePair<>(key, lines);
+//        try (FileInputStream fis = new FileInputStream(inFile)) {
+//            BufferedInputStream bis = new BufferedInputStream(fis);
+//            //ObjectInputStream ois = new ObjectInputStream(bis);
+//            while (bis.available() > 0) {
+//                int object = bis.read();// ois.readObject();
+//                //if (object instanceof KeyValuePair<?, ?>) {
+//                //KeyValuePair<Character, List<Integer>> parsedObject = (KeyValuePair<Character, List<Integer>>) object;
+//                //for (Integer value : parsedObject.getValue()) {
+//                if (result == null) {
+//                    result = new KeyValuePair<>(key, (float) object);
+//                } else {
+//                    result.setValue(result.getValue() + (float) object);
+//                }
+//                //}
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
-    public KeyValuePair<Character, Float> getResult() {
+        if (result != null) {
+            result.setValue((result.getValue() / divisor) * 100);
+        }
         return result;
     }
 }
