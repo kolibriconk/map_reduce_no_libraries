@@ -1,3 +1,4 @@
+import java.io.*;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +42,7 @@ public class MapTask implements Callable<KeyValuePair<Integer, List<KeyValuePair
         input = null;
         List<Character> auxList = new ArrayList<>();
         List<KeyValuePair<Character, List<Integer>>> result = new ArrayList<>();
+
         for (String word : words) {
             for (int j = 0; j < word.length(); j++) {
                 if (!auxList.contains(word.charAt(j))) {

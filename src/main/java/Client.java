@@ -1,3 +1,4 @@
+import javax.swing.text.Utilities;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -17,34 +18,39 @@ public class Client {
             throw new RuntimeException(e);
         }
 
+        cleanTemps();
+
         if (args.length != 0) {
-            List<String> files = Arrays.asList(args);
-            //Uncomment this section to execute the comparison
-            //benchmark(files);
-
-            //Uncomment this section to execute the sequential mode
-            //sequential(files, true);
-
-            //Uncomment this section to execute the parallel mode
+            List<String> argList = Arrays.asList(args);
             long startTime = System.currentTimeMillis();
-            parallel(files, MAX_CORES, true);
+
+            if (argList.contains("-p") || argList.contains("--parallel")) {
+                parallel(argList.subList(1, argList.size()), MAX_CORES, true);
+            }
+
+            if (argList.contains("-s") || argList.contains("--sequential")) {
+                sequential(argList.subList(1, argList.size()), true);
+            }
+
+            if (argList.contains("-b") || argList.contains("--benchmark")) {
+                benchmark(argList.subList(1, argList.size()));
+            }
+
+            if (argList.contains("-h") || argList.contains("--help")) {
+                System.out.println("Usage: java Client [OPTION] [FILE1] [FILE2] ...");
+                System.exit(0);
+            }
+
+            if (argList.contains("-c") || argList.contains("--clean")) {
+                cleanTemps();
+            }
+
             long finishTime = System.currentTimeMillis();
             System.out.println("Total time taken : " + (finishTime - startTime) + " ms");
+
         } else {
-            System.out.println("No files to process");
+            System.out.println("Usage: java Client [OPTION] [FILE1] [FILE2] ...");
         }
-
-        try {
-            File tempDir = new File("temp");
-            File[] tempFiles = tempDir.listFiles();
-            for (File tempFile : tempFiles) {
-                tempFile.delete();
-            }
-            tempDir.delete();
-        } catch (Exception e) {
-            System.out.println("Cannot delete the temp directory");
-        }
-
     }
 
     private static void benchmark(List<String> files) {
@@ -101,6 +107,7 @@ public class Client {
 
     public static void parallel(List<String> files, int threadNumber, boolean usePrint) {
         for (String file : files) {
+            cleanTemps();
             BufferedReader br = null;
             try {
                 ExecutorService es = Executors.newFixedThreadPool(threadNumber);
@@ -122,7 +129,7 @@ public class Client {
                     sb.append(line)
                             .append(" ");
                     currentLine++;
-                    if (currentLine % 50000 == 0 && currentLine != 0 || lines == currentLine) {
+                    if (currentLine % 10000 == 0 && currentLine != 0 || lines == currentLine) {
                         //Executing the map phase
                         MapTask mapTask = new MapTask(sb.toString());
                         sb.setLength(0);
@@ -160,6 +167,15 @@ public class Client {
                         }
                     }
                 }
+                es.shutdown();
+                if (es.awaitTermination(5, TimeUnit.MINUTES)) {
+                    if (futures.size() > 0) {
+                        for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> future : futures) {
+                            totalWords += future.get().getKey();
+                        }
+                        futures.clear();
+                    }
+                }
 
                 List<Character> alreadyAdded = shuffle(fileCounter);
 
@@ -184,6 +200,8 @@ public class Client {
 
     private static List<Character> shuffle(int fileCounter) throws IOException, ClassNotFoundException {
         List<Character> alreadyAdded = new ArrayList<>();
+        bufferedOutputStreams.clear();
+
         for (int i = 0; i < fileCounter; i++) {
             File inFile = new File("temp/temp_" + i + ".txt");
             System.out.println("Processing file " + inFile.getName());
@@ -203,7 +221,7 @@ public class Client {
             }
         }
 
-        System.out.println("Shuffle finished initiating stream closed");
+        System.out.println("Shuffle finished initiating stream closing");
 
         for (BufferedWriter bufferedOutputStream : bufferedOutputStreams) {
             bufferedOutputStream.flush();
@@ -255,4 +273,20 @@ public class Client {
 //            if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
 //        }
 //    }
+
+    private static boolean cleanTemps() {
+        boolean success = false;
+        try {
+            File tempDir = new File("temp");
+            File[] tempFiles = tempDir.listFiles();
+            if (tempFiles != null) {
+                for (File tempFile : tempFiles) {
+                    while (tempFile.delete()) ;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Cannot delete the temp directory");
+        }
+        return success;
+    }
 }
