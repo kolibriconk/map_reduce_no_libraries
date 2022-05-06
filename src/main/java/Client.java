@@ -4,6 +4,11 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * @author Jose Antonio Ramos Andrades - 1565479
+ * @author Victor Sancho Aguilera - 1529721
+ */
+
 public class Client {
 
     static final int MAX_CORES = Runtime.getRuntime().availableProcessors();
@@ -27,11 +32,11 @@ public class Client {
         if (args.length != 0) {
             List<String> argList = Arrays.asList(args);
             if (argList.contains("-p") || argList.contains("--parallel")) {
-                parallel(argList.subList(1, argList.size()), MAX_CORES, 10000, true);
+                parallel(argList.subList(1, argList.size()), MAX_CORES, 1000, true);
             }
 
             if (argList.contains("-s") || argList.contains("--sequential")) {
-                sequential(argList.subList(1, argList.size()), 10000, true);
+                sequential(argList.subList(1, argList.size()), 1000, true);
             }
 
             if (argList.contains("-b") || argList.contains("--benchmark")) {
@@ -61,7 +66,7 @@ public class Client {
         long startTime;
         long finishTime;
         //Try to run the program with different splittingFactor using sequential approach.
-        for (int i = 1000; i < 1000000; i = i * 2) {
+        for (int i = 1000; i < 100000; i = i * 2) {
             startTime = System.currentTimeMillis();
             sequential(files, i, false);
             finishTime = System.currentTimeMillis();
@@ -70,7 +75,7 @@ public class Client {
 
         //Try to run the program with different splittingFactor and threads using parallel approach.
         for (int i = 1; i <= MAX_CORES; i++) {
-            for (int j = 1000; j < 1000000; j = j * 2) {
+            for (int j = 1000; j < 100000; j = j * 2) {
                 startTime = System.currentTimeMillis();
                 parallel(files, i, j, false);
                 finishTime = System.currentTimeMillis();

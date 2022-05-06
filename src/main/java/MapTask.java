@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
+ * @author Jose Antonio Ramos Andrades - 1565479
+ * @author Victor Sancho Aguilera - 1529721
  * MapTask class is responsible for reading the input lines and convert it to key-value pairs.
  * It implements the Callable interface and returns a key-value pair with the key being the
  * word count and the value being a list of key-value pairs that are the characters and their counts.

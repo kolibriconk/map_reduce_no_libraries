@@ -1,10 +1,11 @@
 import java.io.Serializable;
 
 /**
- * A class that represents a key-value pair of dynamic objects.
- *
  * @param <T> The type of the key.
  * @param <R> The type of the value.
+ * @author Jose Antonio Ramos Andrades - 1565479
+ * @author Victor Sancho Aguilera - 1529721
+ * A class that represents a key-value pair of dynamic objects.
  */
 public class KeyValuePair<T, R> implements Serializable {
     private final T key;
