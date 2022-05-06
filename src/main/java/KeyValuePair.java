@@ -1,8 +1,14 @@
 import java.io.Serializable;
 
-public class KeyValuePair<T,R> implements Serializable {
+/**
+ * A class that represents a key-value pair of dynamic objects.
+ *
+ * @param <T> The type of the key.
+ * @param <R> The type of the value.
+ */
+public class KeyValuePair<T, R> implements Serializable {
     private final T key;
-    private R value;
+    private final R value;
 
     public KeyValuePair(T value, R count) {
         this.key = value;
@@ -15,10 +21,6 @@ public class KeyValuePair<T,R> implements Serializable {
 
     public R getValue() {
         return value;
-    }
-
-    public void setValue(R value) {
-        this.value = value;
     }
 
     public boolean equals(Object letter) {

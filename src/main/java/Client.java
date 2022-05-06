@@ -10,6 +10,11 @@ public class Client {
     public static final long MEMORY_SIZE = Runtime.getRuntime().maxMemory();
     public static final long MAX_MEMORY_THRESHOLD = MEMORY_SIZE - MEMORY_SIZE / 4;
 
+    /**
+     * Main method.
+     *
+     * @param args It is expected to be: the program mode and the fileNames to the files to be processed.
+     */
     public static void main(String[] args) {
         try {
             Files.createDirectories(Paths.get("temp"));
@@ -34,7 +39,7 @@ public class Client {
             }
 
             if (argList.contains("-h") || argList.contains("--help")) {
-                System.out.println("Usage: java Client [OPTION] [FILE1] [FILE2] ...");
+                System.out.println("Usage: java Client [OPTION] [FILE1] [FILE2] ... [FILEn]");
                 System.exit(0);
             }
 
@@ -42,22 +47,30 @@ public class Client {
                 cleanTemps();
             }
         } else {
-            System.out.println("Usage: java Client [OPTION] [FILE1] [FILE2] ...");
+            System.out.println("Usage: java Client [OPTION] [FILE1] [FILE2] ... [FILEn]");
         }
     }
 
+    /**
+     * Benchmarking the program by running it sequentially and
+     * parallel with different number of threads and splittingFactor.
+     *
+     * @param files the files to be processed.
+     */
     private static void benchmark(List<String> files) {
         long startTime;
         long finishTime;
-        for (int i = 1000; i < 10000000; i = i * 2) {
+        //Try to run the program with different splittingFactor using sequential approach.
+        for (int i = 1000; i < 1000000; i = i * 2) {
             startTime = System.currentTimeMillis();
             sequential(files, i, false);
             finishTime = System.currentTimeMillis();
             System.out.printf("Sequential mode and %d line splitting takes : %d ms\n", i, (finishTime - startTime));
         }
 
-        for (int i = 1; i < MAX_CORES; i++) {
-            for (int j = 1000; j < 10000000; j = j * 2) {
+        //Try to run the program with different splittingFactor and threads using parallel approach.
+        for (int i = 1; i <= MAX_CORES; i++) {
+            for (int j = 1000; j < 1000000; j = j * 2) {
                 startTime = System.currentTimeMillis();
                 parallel(files, i, j, false);
                 finishTime = System.currentTimeMillis();
@@ -66,7 +79,15 @@ public class Client {
         }
     }
 
+    /**
+     * Splits and map the input file into multiple tasks to be executed sequentially using a single thread (main thread).
+     *
+     * @param files               the files to be mapped.
+     * @param lineSplittingFactor the number of lines to be split into a single task.
+     * @param usePrint            whether to print the output to the console or not.
+     */
     public static void sequential(List<String> files, int lineSplittingFactor, boolean usePrint) {
+        //For each file, split it into multiple tasks and execute them sequentially.
         for (String file : files) {
             cleanTemps();
             BufferedReader br = null;
@@ -77,24 +98,23 @@ public class Client {
                 long lines = Files.lines(Paths.get(file)).count();
                 long currentLine = 0;
                 int fileCounter = 0;
-                br = new BufferedReader(new FileReader(file));
+                br = new BufferedReader(new FileReader(file)); //Using buffered reader to read the file line by line.
                 String line;
-                StringBuilder sb = new StringBuilder();
+                StringBuilder sb = new StringBuilder(); //String builder is used to improve the performance.
                 List<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> futures = new ArrayList<>();
 
                 while ((line = br.readLine()) != null) {
                     sb.append(line)
-                            .append(" ");
+                            .append(" "); //Append the line to the string builder.
                     currentLine++;
                     if (currentLine % lineSplittingFactor == 0 && currentLine != 0 || lines == currentLine) {
-                        //Executing the map phase
+                        //When the line reaches the splitting factor or is the last line create a new task to Map.
                         MapTask mapTask = new MapTask(sb.toString());
                         sb.setLength(0);
                         futures.add(mapTask.call());
-                        //System.out.println("Queued " + currentLine + " from " + lines);
                     }
                     if (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() > MAX_MEMORY_THRESHOLD || (lines == currentLine)) {
-                        //System.out.println("Memory limit reached, waiting for tasks to finish");
+                        //When the memory reaches the threshold or is the last line, write the results to temporary files.
                         if (futures.size() > 0) {
                             File outFile = new File("temp/temp_" + fileCounter + ".txt");
                             FileOutputStream fos = new FileOutputStream(outFile, true);
@@ -104,7 +124,7 @@ public class Client {
                             for (KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> future : futures) {
                                 totalWords += future.getKey();
                                 oos.writeObject(future.getValue());
-                                future = null;
+                                future = null; //Deallocate to free the memory.
                             }
                             oos.flush();
                             oos.close();
@@ -144,11 +164,20 @@ public class Client {
         }
     }
 
+    /**
+     * Splits and map the input file into multiple tasks to be executed in parallel using a pool of threads.
+     *
+     * @param files               the files to be mapped.
+     * @param threadNumber        the number of threads to be used.
+     * @param lineSplittingFactor the number of lines to be split into a single task.
+     * @param usePrint            whether to print the output to the console or not.
+     */
     public static void parallel(List<String> files, int threadNumber, int lineSplittingFactor, boolean usePrint) {
         for (String file : files) {
             cleanTemps();
             BufferedReader br = null;
             try {
+                //Create a thread pool with the number of threads specified.
                 ExecutorService es = Executors.newFixedThreadPool(threadNumber);
                 int totalWords = 0;
                 //Input of the program
@@ -156,30 +185,27 @@ public class Client {
                 long lines = Files.lines(Paths.get(file)).count();
                 long currentLine = 0;
                 int fileCounter = 0;
-                br = new BufferedReader(new FileReader(file));
+                br = new BufferedReader(new FileReader(file)); //Using buffered reader to read the file line by line.
                 String line;
-                List<KeyValuePair<Character, List<Integer>>> result = new ArrayList<>((int) lines);
-
-                StringBuilder sb = new StringBuilder();
-
+                StringBuilder sb = new StringBuilder(); //String builder is used to improve the performance.
                 List<Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>>> futures = new ArrayList<>();
 
                 while ((line = br.readLine()) != null) {
                     sb.append(line)
-                            .append(" ");
+                            .append(" "); //Append the line to the string builder.
                     currentLine++;
                     if (currentLine % lineSplittingFactor == 0 && currentLine != 0 || lines == currentLine) {
-                        //Executing the map phase
+                        //When the line reaches the splitting factor or is the last line create a new task to Map using thread.
                         MapTask mapTask = new MapTask(sb.toString());
                         sb.setLength(0);
                         futures.add(es.submit(mapTask));
-                        //System.out.println("Queued " + currentLine + " from " + lines);
                     }
                     if (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() > MAX_MEMORY_THRESHOLD || (lines == currentLine)) {
-                        //System.out.println("Memory limit reached, waiting for tasks to finish");
-                        es.shutdown();
-                        if (es.awaitTermination(5, TimeUnit.MINUTES)) {
+                        //When the memory reaches the threshold or is the last line, write the results to temporary files.
+                        es.shutdown(); //Shutdown the pool of threads so there are no more tasks to be queued.
+                        if (es.awaitTermination(5, TimeUnit.MINUTES)) { //Wait for the tasks to finish.
                             if (futures.size() > 0) {
+                                //Create a new file to store the partial results.
                                 File outFile = new File("temp/temp_" + fileCounter + ".txt");
                                 FileOutputStream fos = new FileOutputStream(outFile, true);
                                 BufferedOutputStream bos = new BufferedOutputStream(fos);
@@ -189,7 +215,7 @@ public class Client {
                                     KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>> futureResult = future.get();
                                     totalWords += futureResult.getKey();
                                     oos.writeObject(futureResult.getValue());
-                                    futureResult = null;
+                                    futureResult = null; //Deallocate the memory.
                                 }
                                 oos.flush();
                                 oos.close();
@@ -201,18 +227,19 @@ public class Client {
                                 futures.clear();
                             }
                             if (lines != currentLine) {
+                                //If there are more lines to be processed, create a new pool of threads.
                                 es = Executors.newFixedThreadPool(threadNumber);
                             }
                         }
                     }
                 }
-                es.shutdown();
-                if (es.awaitTermination(5, TimeUnit.MINUTES)) {
+                es.shutdown(); //Shutdown the pool of threads so tasks can finish.
+                if (es.awaitTermination(5, TimeUnit.MINUTES)) { //Wait for the tasks to finish.
                     if (futures.size() > 0) {
                         for (Future<KeyValuePair<Integer, List<KeyValuePair<Character, List<Integer>>>>> future : futures) {
-                            totalWords += future.get().getKey();
+                            totalWords += future.get().getKey(); //Sum the total number of words on the input file.
                         }
-                        futures.clear();
+                        futures.clear(); //Clear the list of futures to deallocate the memory.
                     }
                 }
 
@@ -238,50 +265,69 @@ public class Client {
     static volatile List<BufferedWriter> bufferedOutputStreams = new ArrayList<>();
     static volatile List<FileWriter> fileWriters = new ArrayList<>();
 
+    /**
+     * Order the different results on temporary files and write them to different files depending on the character.
+     *
+     * @param fileCounter the number of temporary files created on the previous step.
+     * @return a list of characters that have already been added to a file and consequently a temp file has been created.
+     * @throws IOException            if an I/O error occurs.
+     * @throws ClassNotFoundException if the class of a serialized object cannot be found.
+     */
     private static List<Character> shuffle(int fileCounter) throws IOException, ClassNotFoundException {
         List<Character> alreadyAdded = new ArrayList<>();
         bufferedOutputStreams.clear();
 
         for (int i = 0; i < fileCounter; i++) {
+            //For each temporary file, create a new reader.
             File inFile = new File("temp/temp_" + i + ".txt");
-            //System.out.println("Processing file " + inFile.getName());
             if (inFile.exists()) {
                 FileInputStream fos = new FileInputStream(inFile);
                 BufferedInputStream bos = new BufferedInputStream(fos);
                 ObjectInputStream oos = new ObjectInputStream(bos);
                 while (bos.available() > 0) {
-                    Object o = oos.readObject();
+                    Object o = oos.readObject(); //Read the object from the line.
                     if (o instanceof List<?>) {
-                        List<KeyValuePair<Character, List<Integer>>> parsedObject = (List<KeyValuePair<Character, List<Integer>>>) o;
+                        //Cast the object to a list of KeyValuePairs.
+                        List<KeyValuePair<Character, List<Integer>>> parsedObject
+                                = (List<KeyValuePair<Character, List<Integer>>>) o;
                         for (KeyValuePair<Character, List<Integer>> pair : parsedObject) {
+                            //Call the method to check if the character has already been added to a file.
                             checkAndAdd(alreadyAdded, pair);
                         }
                     }
                 }
+                //Close the reading streams.
                 oos.close();
                 bos.close();
                 fos.close();
             }
         }
 
-        //System.out.println("Shuffle finished initiating stream closing");
-
+        //Close the writing streams.
         for (BufferedWriter bufferedOutputStream : bufferedOutputStreams) {
             bufferedOutputStream.flush();
             bufferedOutputStream.close();
         }
-
+        //Close the writing streams.
         for (FileWriter fileWriter : fileWriters) {
             fileWriter.close();
         }
-
-        //System.out.println("Closed all streams");
-
         return alreadyAdded;
     }
 
+    /**
+     * Checks if the character is already added to the list.
+     * If it is not then it adds.
+     * Independent if the character is previously added or not the pair is written to a temporary file.
+     *
+     * @param alreadyAdded list of already added characters and, consequently, created the temporary file.
+     * @param pair         the pair to be added.
+     * @throws IOException if the temporary file cannot be created or written.
+     */
     private static void checkAndAdd(List<Character> alreadyAdded, KeyValuePair<Character, List<Integer>> pair) throws IOException {
         if (!alreadyAdded.contains(pair.getKey())) {
+            //If the character is not already added, add it to the list.
+            //And create a new temporary file to store this type of character.
             alreadyAdded.add(pair.getKey());
             int index = alreadyAdded.indexOf(pair.getKey());
             File outFile = new File("temp/temp_shuffled_" + index + ".txt");
@@ -292,14 +338,30 @@ public class Client {
         }
         int index = alreadyAdded.indexOf(pair.getKey());
         BufferedWriter bos = bufferedOutputStreams.get(index);
+        //Write the pair to the temporary file.
         bos.write(pair.getValue().get(0));
         bos.write('\n');
     }
 
+    /**
+     * Reduce the stored results from temps files and prints
+     * it to System Console using multithreading.
+     *
+     * @param totalWords   total number of words in the input file.
+     * @param alreadyAdded list of already added characters.
+     * @param threadNumber number of threads to use.
+     * @param usePrint     if true, prints the result to System Console.
+     * @throws IOException            if there is an error while reading from the file.
+     * @throws ClassNotFoundException if there is an error while deserializing the object.
+     * @throws InterruptedException   if there is an error while waiting for the thread to finish.
+     * @throws ExecutionException     if there is an error while waiting for the thread to finish.
+     */
     public static void reduce(int totalWords, List<Character> alreadyAdded, int threadNumber, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
         List<Future<KeyValuePair<Character, Float>>> futures = new ArrayList<>();
+        //Create a thread pool with the number of threads specified.
         ExecutorService es = Executors.newFixedThreadPool(threadNumber);
         for (int i = 0; i < alreadyAdded.size(); i++) {
+            //Create a new thread for each character temp file.
             String fileName = "temp/temp_shuffled_" + i + ".txt";
             ReduceTask reduceTask = new ReduceTask(fileName, totalWords, alreadyAdded.get(i));
             futures.add(es.submit(reduceTask));
@@ -309,13 +371,27 @@ public class Client {
         if (es.awaitTermination(15, TimeUnit.MINUTES) && usePrint) {
             for (Future<KeyValuePair<Character, Float>> future : futures) {
                 KeyValuePair<Character, Float> kvp = future.get();
-                if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
+                //Print the result to System Console if requested.
+                System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
             }
         }
     }
 
+    /**
+     * Reduce the stored results from temps files and prints
+     * it to System Console using sequential approach (no threads).
+     *
+     * @param totalWords   total number of words in the input file.
+     * @param alreadyAdded list of already added characters.
+     * @param usePrint     if true, prints the result to System Console.
+     * @throws IOException            if there is an error while reading from the file.
+     * @throws ClassNotFoundException if there is an error while deserializing the object.
+     * @throws InterruptedException   if there is an error while waiting for the thread to finish.
+     * @throws ExecutionException     if there is an error while waiting for the thread to finish.
+     */
     public static void reduceSequential(int totalWords, List<Character> alreadyAdded, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
         for (int i = 0; i < alreadyAdded.size(); i++) {
+            //For each character temp file, reduce the results.
             String fileName = "temp/temp_shuffled_" + i + ".txt";
             ReduceTask reduceTask = new ReduceTask(fileName, totalWords, alreadyAdded.get(i));
             KeyValuePair<Character, Float> kvp = reduceTask.call();
@@ -323,8 +399,11 @@ public class Client {
         }
     }
 
+
+    /**
+     * Clean temp folder files
+     */
     private static void cleanTemps() {
-        boolean success = false;
         try {
             File tempDir = new File("temp");
             File[] tempFiles = tempDir.listFiles();
