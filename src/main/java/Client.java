@@ -9,11 +9,14 @@ import java.util.concurrent.*;
  * @author Victor Sancho Aguilera - 1529721
  */
 
+@SuppressWarnings("unchecked")
 public class Client {
 
     static final int MAX_CORES = Runtime.getRuntime().availableProcessors();
     public static final long MEMORY_SIZE = Runtime.getRuntime().maxMemory();
     public static final long MAX_MEMORY_THRESHOLD = MEMORY_SIZE - MEMORY_SIZE / 4;
+
+    private static final String READ_PATH = "/data/";
 
     /**
      * Main method.
@@ -32,11 +35,27 @@ public class Client {
         if (args.length != 0) {
             List<String> argList = Arrays.asList(args);
             if (argList.contains("-p") || argList.contains("--parallel")) {
-                parallel(argList.subList(1, argList.size()), MAX_CORES, 1000, true);
+                int splittingFactor = 1000;
+                int index = argList.indexOf("-sf");
+                if (index != -1) {
+                    try {
+                        splittingFactor = Integer.parseInt(argList.get(index + 1));
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                parallel(argList.subList(index + 2, argList.size()), MAX_CORES, splittingFactor, true);
             }
 
             if (argList.contains("-s") || argList.contains("--sequential")) {
-                sequential(argList.subList(1, argList.size()), 1000, true);
+                int splittingFactor = 1000;
+                int index = argList.indexOf("-sf");
+                if (index != -1) {
+                    try {
+                        splittingFactor = Integer.parseInt(argList.get(index + 1));
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                sequential(argList.subList(1, argList.size()), splittingFactor, true);
             }
 
             if (argList.contains("-b") || argList.contains("--benchmark")) {
@@ -91,15 +110,16 @@ public class Client {
      * @param lineSplittingFactor the number of lines to be split into a single task.
      * @param usePrint            whether to print the output to the console or not.
      */
-    public static void sequential(List<String> files, int lineSplittingFactor, boolean usePrint) {
+    private static void sequential(List<String> files, int lineSplittingFactor, boolean usePrint) {
         //For each file, split it into multiple tasks and execute them sequentially.
         for (String file : files) {
+            file = READ_PATH + file;
             cleanTemps();
             BufferedReader br = null;
             try {
                 int totalWords = 0;
                 //Input of the program
-                if (usePrint) System.out.printf("%s:\n", file);
+                if (usePrint) System.out.printf("%s:\n", file.replace(READ_PATH, ""));
                 long lines = Files.lines(Paths.get(file)).count();
                 long currentLine = 0;
                 int fileCounter = 0;
@@ -177,8 +197,9 @@ public class Client {
      * @param lineSplittingFactor the number of lines to be split into a single task.
      * @param usePrint            whether to print the output to the console or not.
      */
-    public static void parallel(List<String> files, int threadNumber, int lineSplittingFactor, boolean usePrint) {
+    private static void parallel(List<String> files, int threadNumber, int lineSplittingFactor, boolean usePrint) {
         for (String file : files) {
+            file = READ_PATH + file;
             cleanTemps();
             BufferedReader br = null;
             try {
@@ -186,7 +207,7 @@ public class Client {
                 ExecutorService es = Executors.newFixedThreadPool(threadNumber);
                 int totalWords = 0;
                 //Input of the program
-                if (usePrint) System.out.printf("%s:\n", file);
+                if (usePrint) System.out.printf("%s:\n", file.replace(READ_PATH, ""));
                 long lines = Files.lines(Paths.get(file)).count();
                 long currentLine = 0;
                 int fileCounter = 0;
@@ -267,7 +288,7 @@ public class Client {
         }
     }
 
-    static volatile List<BufferedWriter> bufferedOutputStreams = new ArrayList<>();
+    static volatile List<BufferedWriter> bufferedWriters = new ArrayList<>();
     static volatile List<FileWriter> fileWriters = new ArrayList<>();
 
     /**
@@ -280,7 +301,7 @@ public class Client {
      */
     private static List<Character> shuffle(int fileCounter) throws IOException, ClassNotFoundException {
         List<Character> alreadyAdded = new ArrayList<>();
-        bufferedOutputStreams.clear();
+        bufferedWriters.clear();
 
         for (int i = 0; i < fileCounter; i++) {
             //For each temporary file, create a new reader.
@@ -309,7 +330,7 @@ public class Client {
         }
 
         //Close the writing streams.
-        for (BufferedWriter bufferedOutputStream : bufferedOutputStreams) {
+        for (BufferedWriter bufferedOutputStream : bufferedWriters) {
             bufferedOutputStream.flush();
             bufferedOutputStream.close();
         }
@@ -339,10 +360,10 @@ public class Client {
             FileWriter fw = new FileWriter(outFile, true);
             fileWriters.add(fw);
             BufferedWriter bos = new BufferedWriter(fw);
-            bufferedOutputStreams.add(bos);
+            bufferedWriters.add(bos);
         }
         int index = alreadyAdded.indexOf(pair.getKey());
-        BufferedWriter bos = bufferedOutputStreams.get(index);
+        BufferedWriter bos = bufferedWriters.get(index);
         //Write the pair to the temporary file.
         bos.write(pair.getValue().get(0));
         bos.write('\n');
@@ -361,7 +382,7 @@ public class Client {
      * @throws InterruptedException   if there is an error while waiting for the thread to finish.
      * @throws ExecutionException     if there is an error while waiting for the thread to finish.
      */
-    public static void reduce(int totalWords, List<Character> alreadyAdded, int threadNumber, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
+    private static void reduce(int totalWords, List<Character> alreadyAdded, int threadNumber, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
         List<Future<KeyValuePair<Character, Float>>> futures = new ArrayList<>();
         //Create a thread pool with the number of threads specified.
         ExecutorService es = Executors.newFixedThreadPool(threadNumber);
@@ -394,7 +415,7 @@ public class Client {
      * @throws InterruptedException   if there is an error while waiting for the thread to finish.
      * @throws ExecutionException     if there is an error while waiting for the thread to finish.
      */
-    public static void reduceSequential(int totalWords, List<Character> alreadyAdded, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
+    private static void reduceSequential(int totalWords, List<Character> alreadyAdded, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
         for (int i = 0; i < alreadyAdded.size(); i++) {
             //For each character temp file, reduce the results.
             String fileName = "temp/temp_shuffled_" + i + ".txt";

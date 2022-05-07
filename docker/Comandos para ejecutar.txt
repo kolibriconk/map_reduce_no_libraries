@@ -1,6 +1,0 @@
-Desde la carpeta ats_2022_... :
-Buildear la imagen: 
-docker build -t ats_map_reduce -f docker/Dockerfile .
-
-Ejecutar el contenendor:
-docker run -it --rm --name ats_map_reduce ats_map_reduce

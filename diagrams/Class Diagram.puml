@@ -1,0 +1,59 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+class Client
+class KeyValuePair
+class MapTask
+class ReduceTask
+interface Serializable
+interface Callable
+
+Client -- KeyValuePair
+Client -- MapTask
+Client -- ReduceTask
+
+MapTask -- KeyValuePair
+ReduceTask -- KeyValuePair
+
+class Client{
+{static}-int MAX_CORES
+{static}-long MEMORY_SIZE
+{static}-long MAX_MEMORY_THRESHOLD \n = MEMORY_SIZE - MEMORY_SIZE / 4
+{static}-final String READ_PATH = "/data/"
+{static}-volatile List<BufferedWriter> bufferedWriters
+{static}-volatile List<FileWriter> fileWriters
+{static}+main(String[] args)
+{static}-benchmark(List<String> files)
+{static}-sequential(List<String> files,\n int lineSplittingFactor, boolean usePrint)
+{static}-parallel(List<String> files, int threadNumber ,\n int lineSplittingFactor, boolean usePrint)
+{static}-checkAndAdd(List<Character> alreadyAdded,\n KeyValuePair<Character, List<Integer>> pair)
+{static}-reduce(int totalWords, List<Character> alreadyAdded, int threadNumber, boolean usePrint)
+{static}-reduceSequential(int totalWords,\n List<Character> alreadyAdded, boolean usePrint)
+{static}-cleanTemps()
+}
+
+class KeyValuePair implements Serializable{
+-final T key
+-final R value
++KeyValuePair(T key, R value)
++T getKey()
++R getValue()
++boolean equals(Object letter)
+}
+
+class MapTask implements Callable{
+-String input
+{static}-final Character[] alphabet
+{static}-final List<KeyValuePair<Character, List<Integer>>> alphabetList
+{static}-final String REGEX_PATTERN = "[^abcdefghijklmnopqrstuvwxyzàá\nâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ ]"
++KeyValuePair<Integer,\n List<KeyValuePair<Character, List<Integer>>>> call()
+}
+
+class ReduceTask implements Callable{
+-String inputFilePath
+-long divisor
+-char key
+
++KeyValuePair<Character, Float> call()
+}
+@enduml

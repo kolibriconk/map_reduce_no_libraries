@@ -1,0 +1,69 @@
+@startuml
+'https://plantuml.com/activity-diagram
+
+start
+
+if (parallel?) then (yes)
+  while (data available?)
+    :read buffer;
+    :split;
+  fork
+    :Thread 1;
+    :map;
+  fork again
+    :Thread 2;
+    :map;
+  fork again
+    :Thread 3;
+    :map;
+  fork again
+    :Thread N;
+    :map;
+  end fork
+
+  if (memory over threshold?) is (yes) then
+    :writeToDisk;
+    :deallocateMemory;
+  endif
+  endwhile
+else (no)
+while (data available?)
+    :read buffer;
+    :split;
+    :map;
+  if (memory over threshold?) is (yes) then
+    :writeToDisk;
+    :deallocateMemory;
+  endif
+  endwhile
+endif
+  :shuffle;
+  if (parallel?) is (yes) then
+      fork
+        :Thread 1 file1;
+        :read lineNumber;
+        :reduce;
+      fork again
+        :Thread 2 file2;
+        :read lineNumber;
+        :reduce;
+      fork again
+        :Thread 3 file3;
+        :read lineNumber;
+        :reduce;
+      fork again
+        :Thread N fileN;
+        :read lineNumber;
+        :reduce;
+      end fork
+  else (no)
+    :false;
+    while (data available?)
+      :read lineNumber;
+      :reduce;
+    endwhile
+  endif
+  :printResults;
+
+end
+@enduml
