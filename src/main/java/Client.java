@@ -37,7 +37,7 @@ public class Client {
         if (args.length != 0) {
             List<String> argList = Arrays.asList(args);
             if (argList.contains("-p") || argList.contains("--parallel")) {
-                int splittingFactor = 1000;
+                int splittingFactor = 4000;
                 int index = argList.indexOf("-sf");
                 if (index != -1) {
                     try {
@@ -45,11 +45,11 @@ public class Client {
                     } catch (NumberFormatException ignored) {
                     }
                 }
-                parallel(argList.subList(index + 2, argList.size()), MAX_CORES, splittingFactor, true);
+                parallel(argList.subList(index + 2, argList.size()), MAX_CORES, splittingFactor, true, false);
             }
 
             if (argList.contains("-s") || argList.contains("--sequential")) {
-                int splittingFactor = 1000;
+                int splittingFactor = 4000;
                 int index = argList.indexOf("-sf");
                 if (index != -1) {
                     try {
@@ -62,6 +62,21 @@ public class Client {
 
             if (argList.contains("-b") || argList.contains("--benchmark")) {
                 benchmark(argList.subList(1, argList.size()));
+            }
+
+            if (argList.contains("-his") || argList.contains("--histogram")) {
+                int index = argList.indexOf("-sf");
+                int splittingFactor = 4000;
+
+                if (index != -1) {
+                    try {
+                        splittingFactor = Integer.parseInt(argList.get(index + 1));
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                int indexOfHis = argList.indexOf("-his");
+                boolean totalHistogram = Boolean.parseBoolean(argList.get(indexOfHis + 1));
+                histogram(argList.subList(index + 2, argList.size()), totalHistogram, splittingFactor);
             }
 
             if (argList.contains("-h") || argList.contains("--help")) {
@@ -100,11 +115,35 @@ public class Client {
         for (int i = 1; i <= MAX_CORES; i++) {
             for (int j = 1000; j < 20000; j += 1000) {
                 startTime = System.currentTimeMillis();
-                parallel(files, i, j, false);
+                parallel(files, i, j, false, true);
                 finishTime = System.currentTimeMillis();
                 System.out.printf("Parallel mode with %d threads and %d lines splitting takes : %d ms\n", i, j, (finishTime - startTime));
             }
         }
+    }
+
+    /**
+     * Method for printing histogram of the words in the file.
+     *
+     * @param files the files to be processed.
+     */
+    private static void histogram(List<String> files, boolean totalHistogram, int splittingFactor) {
+        List<KeyValuePair<Character, Float>> result = new ArrayList<>();
+
+        if (totalHistogram) {
+            result = parallel(files, MAX_CORES, splittingFactor, false, false);
+            createBarChart(result);
+        } else {
+            for (String file : files) {
+                List<String> adapter = new ArrayList<>();
+                adapter.add(file);
+                result = parallel(adapter, MAX_CORES,
+                        splittingFactor, false, true);
+                createBarChart(result);
+            }
+        }
+
+        cleanTemps();
     }
 
     /**
@@ -201,7 +240,10 @@ public class Client {
      * @param lineSplittingFactor the number of lines to be split into a single task.
      * @param usePrint            whether to print the output to the console or not.
      */
-    private static void parallel(List<String> files, int threadNumber, int lineSplittingFactor, boolean usePrint) {
+    private static List<KeyValuePair<Character, Float>> parallel(List<String> files, int threadNumber, int lineSplittingFactor, boolean usePrint, boolean separatePerFile) throws RuntimeException {
+        int totalWords = 0;
+        int fileCounter = 0;
+        List<KeyValuePair<Character, Float>> result = new ArrayList<>();
         for (String file : files) {
             file = READ_PATH + file;
             cleanTemps();
@@ -209,12 +251,14 @@ public class Client {
             try {
                 //Create a thread pool with the number of threads specified.
                 ExecutorService es = Executors.newFixedThreadPool(threadNumber);
-                int totalWords = 0;
+                if (separatePerFile) {
+                    totalWords = 0;
+                    fileCounter = 0;
+                }
                 //Input of the program
-                if (usePrint) System.out.printf("%s:\n", file.replace(READ_PATH, ""));
+                if (usePrint && separatePerFile) System.out.printf("%s:\n", file.replace(READ_PATH, ""));
                 long lines = Files.lines(Paths.get(file)).count();
                 long currentLine = 0;
-                int fileCounter = 0;
                 br = new BufferedReader(new FileReader(file)); //Using buffered reader to read the file line by line.
                 String line;
                 StringBuilder sb = new StringBuilder(); //String builder is used to improve the performance.
@@ -273,9 +317,11 @@ public class Client {
                     }
                 }
 
-                List<Character> alreadyAdded = shuffle(fileCounter);
+                if (separatePerFile) {
+                    List<Character> alreadyAdded = shuffle(fileCounter);
+                    result = reduce(totalWords, alreadyAdded, threadNumber, usePrint);
+                }
 
-                reduce(totalWords, alreadyAdded, threadNumber, usePrint);
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException | ClassNotFoundException e) {
@@ -290,6 +336,21 @@ public class Client {
                 }
             }
         }
+
+        if (!separatePerFile) {
+            if (usePrint) System.out.println("Result of all files: ");
+            List<Character> alreadyAdded = null;
+            try {
+                alreadyAdded = shuffle(fileCounter);
+                result = reduce(totalWords, alreadyAdded, threadNumber, usePrint);
+            } catch (IOException | ClassNotFoundException e) {
+                System.out.println("Cannot read the output file");
+            } catch (ExecutionException | InterruptedException e) {
+                System.out.println("Cannot execute the reduce function");
+            }
+        }
+
+        return result;
     }
 
     static volatile List<BufferedWriter> bufferedWriters = new ArrayList<>();
@@ -381,13 +442,15 @@ public class Client {
      * @param alreadyAdded list of already added characters.
      * @param threadNumber number of threads to use.
      * @param usePrint     if true, prints the result to System Console.
+     * @return the list of results.
      * @throws IOException            if there is an error while reading from the file.
      * @throws ClassNotFoundException if there is an error while deserializing the object.
      * @throws InterruptedException   if there is an error while waiting for the thread to finish.
      * @throws ExecutionException     if there is an error while waiting for the thread to finish.
      */
-    private static void reduce(int totalWords, List<Character> alreadyAdded, int threadNumber, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
+    private static List<KeyValuePair<Character, Float>> reduce(int totalWords, List<Character> alreadyAdded, int threadNumber, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
         List<Future<KeyValuePair<Character, Float>>> futures = new ArrayList<>();
+        List<KeyValuePair<Character, Float>> result = new ArrayList<>();
         //Create a thread pool with the number of threads specified.
         ExecutorService es = Executors.newFixedThreadPool(threadNumber);
         for (int i = 0; i < alreadyAdded.size(); i++) {
@@ -398,13 +461,16 @@ public class Client {
         }
         es.shutdown();
 
-        if (es.awaitTermination(15, TimeUnit.MINUTES) && usePrint) {
+        if (es.awaitTermination(10, TimeUnit.MINUTES)) {
             for (Future<KeyValuePair<Character, Float>> future : futures) {
                 KeyValuePair<Character, Float> kvp = future.get();
                 //Print the result to System Console if requested.
-                System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
+                result.add(kvp);
+                if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
             }
         }
+
+        return result;
     }
 
     /**
@@ -420,37 +486,32 @@ public class Client {
      * @throws ExecutionException     if there is an error while waiting for the thread to finish.
      */
     private static void reduceSequential(int totalWords, List<Character> alreadyAdded, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
-            List<KeyValuePair<Character, Float>> result = new ArrayList<>();
-            for (int i = 0; i < alreadyAdded.size(); i++) {
+        for (int i = 0; i < alreadyAdded.size(); i++) {
             //For each character temp file, reduce the results.
             String fileName = "temp/temp_shuffled_" + i + ".txt";
             ReduceTask reduceTask = new ReduceTask(fileName, totalWords, alreadyAdded.get(i));
             KeyValuePair<Character, Float> kvp = reduceTask.call();
-            result.add(kvp);
             if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
         }
-        if(true) createBarChartSequencial(result);
     }
 
     /**
      * Create the histogram chart of the squenctial mode with the dataset given.
      *
-     * @param result_reduce     result of the reduce phase in sequential mode
-     * @throws Exception        if there is an error when creating the Histogram chart
+     * @param result_reduce result of the reduce phase in sequential mode
+     * @throws Exception if there is an error when creating the Histogram chart
      */
-    public static void createBarChartSequencial(List<KeyValuePair<Character, Float>> result_reduce){
+    private static void createBarChart(List<KeyValuePair<Character, Float>> result_reduce) {
         try {
-            SwingUtilities.invokeAndWait(()->{
-                BarChart example=new BarChart("Histogram", result_reduce);
+            SwingUtilities.invokeAndWait(() -> {
+                BarChart example = new BarChart("Histogram", result_reduce);
                 example.setSize(800, 400);
                 example.setLocationRelativeTo(null);
                 example.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
                 example.setVisible(true);
             });
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
-            e.printStackTrace();
+        } catch (InterruptedException | InvocationTargetException e) {
+            System.out.println("Error creating the histogram chart");
         }
     }
 
