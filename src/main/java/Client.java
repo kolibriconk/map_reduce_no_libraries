@@ -1,4 +1,6 @@
+import javax.swing.*;
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -87,7 +89,7 @@ public class Client {
         long startTime;
         long finishTime;
         //Try to run the program with different splittingFactor using sequential approach.
-        for (int i = 1000; i < 100000; i = i * 2) {
+        for (int i = 1000; i < 20000; i += 1000) {
             startTime = System.currentTimeMillis();
             sequential(files, i, false);
             finishTime = System.currentTimeMillis();
@@ -96,7 +98,7 @@ public class Client {
 
         //Try to run the program with different splittingFactor and threads using parallel approach.
         for (int i = 1; i <= MAX_CORES; i++) {
-            for (int j = 1000; j < 100000; j = j * 2) {
+            for (int j = 1000; j < 20000; j += 1000) {
                 startTime = System.currentTimeMillis();
                 parallel(files, i, j, false);
                 finishTime = System.currentTimeMillis();
@@ -418,15 +420,39 @@ public class Client {
      * @throws ExecutionException     if there is an error while waiting for the thread to finish.
      */
     private static void reduceSequential(int totalWords, List<Character> alreadyAdded, boolean usePrint) throws IOException, ClassNotFoundException, InterruptedException, ExecutionException {
-        for (int i = 0; i < alreadyAdded.size(); i++) {
+            List<KeyValuePair<Character, Float>> result = new ArrayList<>();
+            for (int i = 0; i < alreadyAdded.size(); i++) {
             //For each character temp file, reduce the results.
             String fileName = "temp/temp_shuffled_" + i + ".txt";
             ReduceTask reduceTask = new ReduceTask(fileName, totalWords, alreadyAdded.get(i));
             KeyValuePair<Character, Float> kvp = reduceTask.call();
+            result.add(kvp);
             if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
         }
+        if(true) createBarChartSequencial(result);
     }
 
+    /**
+     * Create the histogram chart of the squenctial mode with the dataset given.
+     *
+     * @param result_reduce     result of the reduce phase in sequential mode
+     * @throws Exception        if there is an error when creating the Histogram chart
+     */
+    public static void createBarChartSequencial(List<KeyValuePair<Character, Float>> result_reduce){
+        try {
+            SwingUtilities.invokeAndWait(()->{
+                BarChart example=new BarChart("Histogram", result_reduce);
+                example.setSize(800, 400);
+                example.setLocationRelativeTo(null);
+                example.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+                example.setVisible(true);
+            });
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * Clean temp folder files
