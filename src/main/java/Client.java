@@ -497,10 +497,9 @@ public class Client {
     }
 
     /**
-     * Create the histogram chart of the squenctial mode with the dataset given.
+     * Create the histogram chart of the parallel mode with the dataset given.
      *
      * @param result_reduce result of the reduce phase in sequential mode
-     * @throws Exception if there is an error when creating the Histogram chart
      */
     private static void createBarChart(List<KeyValuePair<Character, Float>> result_reduce) {
         try {

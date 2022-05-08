@@ -9,9 +9,21 @@ import org.jfree.data.category.DefaultCategoryDataset;
 
 import java.util.List;
 
+/**
+ * @param appTitle
+ * @param result_dataset
+ * This class generates the Histogram bar chart for the dataset given
+ */
+
+
 public class BarChart extends JFrame {
 
-
+    /**
+     * Constructor for the class, creates the dataset and initiates the chart
+     *
+     * @param appTitle
+     * @param result_dataset
+     */
     public BarChart(String appTitle, List<KeyValuePair<Character, Float>> result_dataset) {
         super(appTitle);
 
@@ -32,6 +44,11 @@ public class BarChart extends JFrame {
         setContentPane(panel);
     }
 
+    /**
+     * This method creates a new dataset for the barchart class with the KeyValuePairs given
+     * @param result_dataset
+     * @return the dataset to represent in the chart
+     */
     private CategoryDataset createDataset(List<KeyValuePair<Character, Float>> result_dataset) {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         for (KeyValuePair<Character, Float> kvp:result_dataset){
