@@ -73,6 +73,8 @@ public class Client {
         } else {
             System.out.println("Usage: java Client [OPTION] [FILE1] [FILE2] ... [FILEn]");
         }
+
+        cleanTemps();
     }
 
     /**

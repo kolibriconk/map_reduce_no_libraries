@@ -23,9 +23,4 @@ public class KeyValuePair<T, R> implements Serializable {
     public R getValue() {
         return value;
     }
-
-    public boolean equals(Object letter) {
-        return this.key == letter;
-    }
-
 }
