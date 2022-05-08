@@ -1,8 +1,8 @@
 FROM bitnami/java:latest
 WORKDIR /my_app
-COPY . .
+COPY src/ .
 RUN chmod +x TextCounter
-WORKDIR /my_app/src/main/java
+WORKDIR /my_app/main/java
 RUN javac *.java
 RUN jar cfm client.jar manifest.mf *.class
 WORKDIR /my_app
