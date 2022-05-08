@@ -45,7 +45,7 @@ public class Client {
                     } catch (NumberFormatException ignored) {
                     }
                 }
-                parallel(argList.subList(index + 2, argList.size()), MAX_CORES, splittingFactor, true, false);
+                parallel(argList.subList(index + 2, argList.size()), MAX_CORES, splittingFactor, true, true);
             }
 
             if (argList.contains("-s") || argList.contains("--sequential")) {
@@ -468,6 +468,7 @@ public class Client {
                 result.add(kvp);
                 if (usePrint) System.out.printf("%s : %.2f%s", kvp.getKey(), kvp.getValue(), "%\n");
             }
+            System.out.println();
         }
 
         return result;
