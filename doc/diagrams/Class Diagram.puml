@@ -5,12 +5,14 @@ class Client
 class KeyValuePair
 class MapTask
 class ReduceTask
+class BarChart
 interface Serializable
 interface Callable
 
 Client -- KeyValuePair
 Client -- MapTask
 Client -- ReduceTask
+Client -- BarChart
 
 MapTask -- KeyValuePair
 ReduceTask -- KeyValuePair
@@ -56,4 +58,10 @@ class ReduceTask implements Callable{
 
 +KeyValuePair<Character, Float> call()
 }
+
+Class BarChart extends JFrame{
++BarChart(String appTitle, List<KeyValuePair<Character, Float>> result_dataset)
+-createDataset(List<KeyValuePair<Character, Float>> result_dataset)
+}
+
 @enduml
