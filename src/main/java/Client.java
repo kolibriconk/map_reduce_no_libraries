@@ -37,7 +37,7 @@ public class Client {
         if (args.length != 0) {
             List<String> argList = Arrays.asList(args);
             if (argList.contains("-p") || argList.contains("--parallel")) {
-                int splittingFactor = 4000;
+                int splittingFactor = 3000;
                 int index = argList.indexOf("-sf");
                 if (index != -1) {
                     try {
@@ -66,7 +66,7 @@ public class Client {
 
             if (argList.contains("-his") || argList.contains("--histogram")) {
                 int index = argList.indexOf("-sf");
-                int splittingFactor = 4000;
+                int splittingFactor = 3000;
 
                 if (index != -1) {
                     try {
@@ -131,14 +131,14 @@ public class Client {
         List<KeyValuePair<Character, Float>> result = new ArrayList<>();
 
         if (totalHistogram) {
-            result = parallel(files, MAX_CORES, splittingFactor, false, false);
+            result = parallel(files, MAX_CORES, splittingFactor, true, false);
             createBarChart(result);
         } else {
             for (String file : files) {
                 List<String> adapter = new ArrayList<>();
                 adapter.add(file);
                 result = parallel(adapter, MAX_CORES,
-                        splittingFactor, false, true);
+                        splittingFactor, true, true);
                 createBarChart(result);
             }
         }
